@@ -33,16 +33,18 @@ ${JSON.stringify(codegenIndex ?? {}, null, 2)}
 TOOLS AVAILABLE
 * read_file(path, start_line?, end_line?) -> Read file content
 * write_file(path, content) -> Overwrite full file content (preferred for large rewrites)
-* apply_patch(patch_string) -> Apply code changes using a diff patch (supports Add/Update/Delete)
+* apply_patch(patch_string) -> Apply code changes using a diff patch (supports Add/Update/Delete/Move)
 * submit_codegen_done(summary) -> Signal you're finished (TERMINAL)
 
 APPLY_PATCH FORMAT (required)
 * Pass a RAW STRING to apply_patch. Do NOT wrap it in JSON.
 * The string MUST start with "*** Begin Patch" and end with "*** End Patch".
 * Use EXACTLY ONE "*** Begin Patch" and EXACTLY ONE "*** End Patch" per apply_patch call.
+* IMPORTANT: Do NOT indent any patch lines. Do NOT wrap patches in Markdown code fences (triple backticks). All "*** ..." headers must start at column 0.
 * Supported operations:
   - "*** Add File: <path>" -> Create a new file with the following hunks.
   - "*** Update File: <path>" -> Update an existing file.
+  - "*** Move to: <path>" -> OPTIONAL (only after Update File): rename/move the updated file.
   - "*** Delete File: <path>" -> Remove a file.
 * For Add/Update, include hunks using "@@" markers, with lines prefixed by:
   - " " for unchanged context
@@ -50,28 +52,28 @@ APPLY_PATCH FORMAT (required)
   - "+" for added lines
 * IMPORTANT: Do NOT paste a full file under "*** Update File:" without "+" / "-" prefixes; unprefixed lines are treated as context and will fail unless the file already matches.
 * If you want to replace an entire file, prefer Delete+Add:
-  *** Begin Patch
-  *** Delete File: app/page.tsx
-  *** Add File: app/page.tsx
-  @@
-  +<entire file contents...>
-  *** End Patch
+*** Begin Patch
+*** Delete File: app/page.tsx
+*** Add File: app/page.tsx
+@@
++<entire file contents...>
+*** End Patch
 * Example (multi-operation):
-  *** Begin Patch
-  *** Add File: src/new.ts
-  @@
-  +export const x = 1;
-  *** Update File: src/app.ts
-  @@
-  -console.log(1);
-  +console.log(2);
-  *** Delete File: src/old.ts
-  *** End Patch
+*** Begin Patch
+*** Add File: src/new.ts
+@@
++export const x = 1;
+*** Update File: src/app.ts
+@@
+-console.log(1);
++console.log(2);
+*** Delete File: src/old.ts
+*** End Patch
 
 SAFE PATCH STRATEGY:
 1) read_file(path)
-2) If change is small AND exact lines are visible → use apply_patch
-3) Otherwise → use write_file with full updated content
+2) If change is small AND exact lines are visible -> use apply_patch
+3) Otherwise -> use write_file with full updated content
 
 EXECUTION RULES
 * Always read before writing.
@@ -85,4 +87,3 @@ EXECUTION RULES
 * If exact context is unknown, DO NOT use apply_patch.
 `;
 };
-

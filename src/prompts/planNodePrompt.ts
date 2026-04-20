@@ -13,7 +13,7 @@ export const planNodePrompt = (params: PlanNodePromptParams) => {
   return `
 You are a senior software architect. Based on the provided PM plan and code context, generate a detailed technical implementation plan.
 Provide precise, step-by-step instructions for a code-generation agent; ensure tasks are explicit and highly granular.
-${isNewProject ? "The project you are given is currently a boilerplate. You've to create tasks to modify it as per given PM Plan" : "The project has already gone through some stages of modfication, and you've to only create tasks to implement latest recommendations from PM"}
+${isNewProject ? "The project you are given is currently a boilerplate project that contains some existing code. You've to create tasks to modify it as per given PM Plan. Please make sure that there are no traces of the boilerplate in the final project." : "The project has already gone through some stages of modfication, and you've to only create tasks to implement latest recommendations from PM"}
 
 Request type (label): ${requestTypeLabel}
 
@@ -52,9 +52,10 @@ You MAY use these tools to inspect the workspace before finalizing tasks:
 * list_dir
 * submit_planner_tasks (FINAL)
 
+For example you can use list_dir to inspect the folder structure of the project.
+
 **IMPORTANT**: 
-- You NO LONGER have create_file or delete_file tools.
-- The Codegen agent IS capable of creating/deleting files via apply_patch.
+- The Codegen agent IS capable of creating/deleting files via apply_patch, YOU CAN'T create/delete/modify a file.
 - If your plan requires a new file, include the creation instruction in the task description for the Codegen agent.
 
 Tool-use guidance (Save Tokens):

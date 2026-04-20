@@ -1,6 +1,7 @@
 export type ApplyPatchOperation = {
     kind: "update";
     filePath: string;
+    moveTo?: string;
     hunks: PatchHunk[];
 } | {
     kind: "add";

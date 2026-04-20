@@ -5,9 +5,53 @@ const normalizeLineForLooseMatch = (value) => value
     .replace(/;$/g, "")
     .replace(/['"]/g, '"');
 const normalizeLineForWhitespaceAgnosticMatch = (value) => normalizeLineForLooseMatch(value).trim().replace(/\s+/g, " ");
-export function parseApplyPatch(patchString) {
+const stripOuterMarkdownCodeFence = (value) => {
+    const lines = value.split("\n");
+    let start = 0;
+    while (start < lines.length && !lines[start].trim())
+        start += 1;
+    let end = lines.length - 1;
+    while (end >= 0 && !lines[end].trim())
+        end -= 1;
+    if (start >= end)
+        return value;
+    const first = lines[start].trim();
+    const last = lines[end].trim();
+    const isFenceStart = /^```[a-zA-Z0-9_-]*\s*$/.test(first);
+    const isFenceEnd = last === "```";
+    if (!isFenceStart || !isFenceEnd)
+        return value;
+    return lines.slice(start + 1, end).join("\n");
+};
+const dedentBlock = (value) => {
+    const lines = value.split("\n");
+    let minIndent = null;
+    for (const line of lines) {
+        if (!line.trim())
+            continue;
+        const match = /^[ \t]+/.exec(line);
+        const indent = match ? match[0].length : 0;
+        minIndent = minIndent === null ? indent : Math.min(minIndent, indent);
+        if (minIndent === 0)
+            break;
+    }
+    if (!minIndent)
+        return value;
+    return lines
+        .map((line) => {
+        if (!line.trim())
+            return line;
+        return line.slice(minIndent);
+    })
+        .join("\n");
+};
+const preprocessPatchString = (patchString) => {
     const normalized = normalizeNewlines(patchString ?? "");
-    const rawLines = normalized.split("\n");
+    return dedentBlock(stripOuterMarkdownCodeFence(normalized));
+};
+export function parseApplyPatch(patchString) {
+    const preprocessed = preprocessPatchString(patchString);
+    const rawLines = preprocessed.split("\n");
     let startIndex = 0;
     while (startIndex < rawLines.length && !rawLines[startIndex].trim()) {
         startIndex += 1;
@@ -60,8 +104,15 @@ export function parseApplyPatch(patchString) {
                 throw new Error(`Invalid patch: empty ${kind === "add" ? "Add" : "Update"} File path.`);
             }
             i += 1;
+            let moveTo;
             if (i < lines.length && lines[i].startsWith("*** Move to:")) {
-                throw new Error(`Invalid patch: Move operations are not allowed in apply_patch.`);
+                if (kind !== "update") {
+                    throw new Error(`Invalid patch: Move operations are only allowed for Update File.`);
+                }
+                moveTo = lines[i].slice("*** Move to:".length).trim();
+                if (!moveTo)
+                    throw new Error(`Invalid patch: empty Move to path.`);
+                i += 1;
             }
             const hunks = [];
             let currentHunk = null;
@@ -120,7 +171,7 @@ export function parseApplyPatch(patchString) {
                 i += 1;
             }
             pushHunk();
-            operations.push({ kind, filePath, hunks });
+            operations.push({ kind, filePath, moveTo, hunks });
             continue;
         }
         if (line.startsWith("*** Delete File:")) {

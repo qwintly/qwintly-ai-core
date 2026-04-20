@@ -15,9 +15,20 @@ export declare const createWorkspaceToolImpls: (deps: SearchDeps) => {
     searchImpl: (searchQuery: string) => Promise<import("./search.impl.js").SearchResult[]>;
     applyPatchImpl: (patchString: string) => Promise<{
         success: boolean;
+        changed: boolean;
+        warnings: string[] | undefined;
         error?: undefined;
+        debug?: undefined;
     } | {
         success: boolean;
         error: string;
+        debug: {
+            files: {
+                path: string;
+                head: string;
+            }[];
+        } | undefined;
+        changed?: undefined;
+        warnings?: undefined;
     }>;
 };

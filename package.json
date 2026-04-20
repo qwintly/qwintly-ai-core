@@ -24,7 +24,7 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
-    "test": "echo \"(no tests)\""
+    "test": "npm run build && node --test dist"
   },
   "peerDependencies": {
     "@google/genai": "^1.33.0"

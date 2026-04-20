@@ -6,26 +6,36 @@ const normalizeForPrefixCheck = (value: string) =>
 const stripKnownWorkspacePrefix = (inputPath: string, workspaceRoot: string) => {
   const inputNormalized = normalizeForPrefixCheck(inputPath);
   const workspaceNormalized = normalizeForPrefixCheck(workspaceRoot);
+  const caseInsensitive = process.platform === "win32";
+  const inputCmp = caseInsensitive ? inputNormalized.toLowerCase() : inputNormalized;
+  const workspaceCmp = caseInsensitive
+    ? workspaceNormalized.toLowerCase()
+    : workspaceNormalized;
 
   if (
-    inputNormalized === workspaceNormalized ||
-    inputNormalized.startsWith(`${workspaceNormalized}/`)
+    inputCmp === workspaceCmp ||
+    inputCmp.startsWith(`${workspaceCmp}/`)
   ) {
     return inputNormalized.slice(workspaceNormalized.length);
   }
 
   const hardcodedWorkspace = "/tmp/workspace";
   if (
-    inputNormalized === hardcodedWorkspace ||
-    inputNormalized.startsWith(`${hardcodedWorkspace}/`)
+    inputCmp === (caseInsensitive ? hardcodedWorkspace.toLowerCase() : hardcodedWorkspace) ||
+    inputCmp.startsWith(`${caseInsensitive ? hardcodedWorkspace.toLowerCase() : hardcodedWorkspace}/`)
   ) {
     return inputNormalized.slice(hardcodedWorkspace.length);
   }
 
   const hardcodedWorkspaceNoSlash = "tmp/workspace";
   if (
-    inputNormalized === hardcodedWorkspaceNoSlash ||
-    inputNormalized.startsWith(`${hardcodedWorkspaceNoSlash}/`)
+    inputCmp ===
+      (caseInsensitive
+        ? hardcodedWorkspaceNoSlash.toLowerCase()
+        : hardcodedWorkspaceNoSlash) ||
+    inputCmp.startsWith(
+      `${caseInsensitive ? hardcodedWorkspaceNoSlash.toLowerCase() : hardcodedWorkspaceNoSlash}/`,
+    )
   ) {
     return inputNormalized.slice(hardcodedWorkspaceNoSlash.length);
   }
@@ -54,4 +64,3 @@ export const toWorkspacePath = (workspaceRoot: string, inputPath: string) => {
 
   return resolved;
 };
-

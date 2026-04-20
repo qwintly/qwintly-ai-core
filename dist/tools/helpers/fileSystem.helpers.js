@@ -3,18 +3,26 @@ const normalizeForPrefixCheck = (value) => value.replace(/\\/g, "/").replace(/\/
 const stripKnownWorkspacePrefix = (inputPath, workspaceRoot) => {
     const inputNormalized = normalizeForPrefixCheck(inputPath);
     const workspaceNormalized = normalizeForPrefixCheck(workspaceRoot);
-    if (inputNormalized === workspaceNormalized ||
-        inputNormalized.startsWith(`${workspaceNormalized}/`)) {
+    const caseInsensitive = process.platform === "win32";
+    const inputCmp = caseInsensitive ? inputNormalized.toLowerCase() : inputNormalized;
+    const workspaceCmp = caseInsensitive
+        ? workspaceNormalized.toLowerCase()
+        : workspaceNormalized;
+    if (inputCmp === workspaceCmp ||
+        inputCmp.startsWith(`${workspaceCmp}/`)) {
         return inputNormalized.slice(workspaceNormalized.length);
     }
     const hardcodedWorkspace = "/tmp/workspace";
-    if (inputNormalized === hardcodedWorkspace ||
-        inputNormalized.startsWith(`${hardcodedWorkspace}/`)) {
+    if (inputCmp === (caseInsensitive ? hardcodedWorkspace.toLowerCase() : hardcodedWorkspace) ||
+        inputCmp.startsWith(`${caseInsensitive ? hardcodedWorkspace.toLowerCase() : hardcodedWorkspace}/`)) {
         return inputNormalized.slice(hardcodedWorkspace.length);
     }
     const hardcodedWorkspaceNoSlash = "tmp/workspace";
-    if (inputNormalized === hardcodedWorkspaceNoSlash ||
-        inputNormalized.startsWith(`${hardcodedWorkspaceNoSlash}/`)) {
+    if (inputCmp ===
+        (caseInsensitive
+            ? hardcodedWorkspaceNoSlash.toLowerCase()
+            : hardcodedWorkspaceNoSlash) ||
+        inputCmp.startsWith(`${caseInsensitive ? hardcodedWorkspaceNoSlash.toLowerCase() : hardcodedWorkspaceNoSlash}/`)) {
         return inputNormalized.slice(hardcodedWorkspaceNoSlash.length);
     }
     return null;
