@@ -1,7 +1,44 @@
 import { FunctionCallingConfigMode } from "@google/genai";
 import { compactForModel, DEFAULT_CONTEXT_POLICY, getApplyPatchEventMeta, normalizeReadFileArgs, redactFunctionCallArgs, } from "./toolLoopContext.js";
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
+const isTransientAiCallError = (err) => {
+    const anyErr = err;
+    const code = anyErr?.error?.code ??
+        anyErr?.code ??
+        anyErr?.statusCode ??
+        anyErr?.response?.status;
+    const status = anyErr?.error?.status ??
+        anyErr?.status ??
+        anyErr?.response?.data?.error?.status;
+    const message = anyErr?.error?.message ??
+        anyErr?.message ??
+        anyErr?.response?.data?.error?.message;
+    const msg = typeof message === "string" ? message.toLowerCase() : "";
+    const stat = typeof status === "string" ? status.toUpperCase() : "";
+    if (code === 503)
+        return true;
+    if (code === 429)
+        return true;
+    if (stat === "UNAVAILABLE")
+        return true;
+    if (stat === "RESOURCE_EXHAUSTED")
+        return true;
+    if (msg.includes("high demand"))
+        return true;
+    if (msg.includes("try again later"))
+        return true;
+    if (msg.includes("temporar"))
+        return true;
+    return false;
+};
+const computeBackoffMs = (attempt, baseMs, maxMs) => {
+    const exp = baseMs * Math.pow(2, Math.max(0, attempt - 1));
+    const capped = Math.min(maxMs, exp);
+    const jitter = capped * (0.2 * Math.random());
+    return Math.round(capped + jitter);
+};
 export async function runToolLoop(options) {
-    const { initialContents, tools, handlers, maxSteps = 30, model, toolCallingMode = FunctionCallingConfigMode.ANY, terminalToolNames = [], keepFullTrace = true, contextPolicy, aiCall, logger, applyPatchAutoRetryMax = 0, } = options;
+    const { initialContents, tools, handlers, maxSteps = 30, model, toolCallingMode = FunctionCallingConfigMode.ANY, terminalToolNames = [], keepFullTrace = true, contextPolicy, aiCall, logger, applyPatchAutoRetryMax = 0, aiCallAutoRetryMax = 3, aiCallAutoRetryBaseMs = 400, aiCallAutoRetryMaxMs = 10000, } = options;
     if (typeof aiCall !== "function") {
         throw new Error("Tool loop: aiCall is required.");
     }
@@ -32,11 +69,31 @@ export async function runToolLoop(options) {
             const approxChars = JSON.stringify(modelContents).length;
             logger?.info?.(`Tool loop: approx model chars=${approxChars} step=${step + 1}`);
         }
-        const response = await aiCall(modelContents, {
-            tools,
-            model,
-            toolCallingMode,
-        });
+        let response;
+        {
+            let retryCount = 0;
+            while (true) {
+                try {
+                    response = await aiCall(modelContents, {
+                        tools,
+                        model,
+                        toolCallingMode,
+                    });
+                    break;
+                }
+                catch (err) {
+                    const transient = isTransientAiCallError(err);
+                    if (!transient || aiCallAutoRetryMax <= 0 || retryCount >= aiCallAutoRetryMax) {
+                        throw err;
+                    }
+                    retryCount += 1;
+                    const delayMs = computeBackoffMs(retryCount, aiCallAutoRetryBaseMs, aiCallAutoRetryMaxMs);
+                    const msg = err instanceof Error ? err.message : String(err);
+                    logger?.warn?.(`Tool loop: aiCall failed (retry ${retryCount}/${aiCallAutoRetryMax}) transient=${transient}: ${msg}. Retrying in ${delayMs}ms...`);
+                    await sleep(delayMs);
+                }
+            }
+        }
         const functionCalls = response.functionCalls ?? [];
         if (functionCalls.length === 0) {
             return {

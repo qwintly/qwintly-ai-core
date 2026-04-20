@@ -38,6 +38,9 @@ export type RunToolLoopOptions = {
     aiCall: AiCallFn;
     logger?: ToolLoopLogger;
     applyPatchAutoRetryMax?: number;
+    aiCallAutoRetryMax?: number;
+    aiCallAutoRetryBaseMs?: number;
+    aiCallAutoRetryMaxMs?: number;
 };
 export declare function runToolLoop(options: RunToolLoopOptions): Promise<ToolLoopResult>;
 export {};
