@@ -1,6 +1,6 @@
 import { FunctionCallingConfigMode } from "@google/genai";
-import { compactForModel, DEFAULT_CONTEXT_POLICY, normalizeReadFileArgs, redactFunctionCallArgs, } from "./toolLoopContext.js";
-import { buildToolStatusMessage, aiCallWithRetry, recordToolEvent, serializeError, } from "./toolLoopRunnerUtils.js";
+import { compactForModel, DEFAULT_CONTEXT_POLICY, normalizeReadFileArgs, redactFunctionCallArgs } from "./toolLoopContext.js";
+import { aiCallWithRetry, buildToolStatusMessage, recordToolEvent, serializeError, } from "./toolLoopRunnerUtils.js";
 export async function runToolLoop(options) {
     const { initialContents, tools, handlers, maxSteps = 30, model, toolCallingMode = FunctionCallingConfigMode.ANY, terminalToolNames = [], keepFullTrace = true, contextPolicy, aiCall, logger, applyPatchAutoRetryMax = 2, aiCallAutoRetryMax = 3, // must have it to try 3 times as gemini errors a lot due to high demand sometimes
     aiCallAutoRetryBaseMs = 400, aiCallAutoRetryMaxMs = 10000, } = options;

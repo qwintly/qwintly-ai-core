@@ -2,15 +2,14 @@ import { FunctionCallingConfigMode, Tool } from "@google/genai";
 import {
   compactForModel,
   DEFAULT_CONTEXT_POLICY,
-  getApplyPatchEventMeta,
   normalizeReadFileArgs,
   redactFunctionCallArgs,
   ToolEvent,
-  ToolLoopContextPolicy,
+  ToolLoopContextPolicy
 } from "./toolLoopContext.js";
 import {
-  buildToolStatusMessage,
   aiCallWithRetry,
+  buildToolStatusMessage,
   recordToolEvent,
   serializeError,
 } from "./toolLoopRunnerUtils.js";

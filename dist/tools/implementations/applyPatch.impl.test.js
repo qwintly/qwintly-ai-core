@@ -41,33 +41,32 @@ test('apply_patch: Update + Move writes new path and deletes old path', async ()
     const workspaceRoot = path.resolve("C:\\virtual-workspace");
     const fs = makeMemFs();
     const applyPatch = createApplyPatchImpl({ workspaceRoot, fs });
-    fs.files.set(path.resolve(workspaceRoot, "a.txt"), "hello\n");
+    fs.files.set(path.resolve(workspaceRoot, "app/a/page.config.ts"), "export const config = { elements: [] };\n");
     const res = await applyPatch(`*** Begin Patch
-*** Update File: a.txt
-*** Move to: b.txt
+*** Update File: app/a/page.config.ts
+*** Move to: app/b/page.config.ts
 @@
--hello
-+hi
+ export const config = { elements: [] };
 *** End Patch
 `);
     assert.equal(res.success, true);
     assert.equal(res.changed, true);
-    assert.equal(fs.files.has(path.resolve(workspaceRoot, "a.txt")), false);
-    assert.equal(fs.files.get(path.resolve(workspaceRoot, "b.txt")), "hi\n");
+    assert.equal(fs.files.has(path.resolve(workspaceRoot, "app/a/page.config.ts")), false);
+    assert.equal(fs.files.get(path.resolve(workspaceRoot, "app/b/page.config.ts")), "export const config = { elements: [] };\n");
 });
 test("apply_patch: context-only Update succeeds as no-op", async () => {
     const workspaceRoot = path.resolve("C:\\virtual-workspace");
     const fs = makeMemFs();
     const applyPatch = createApplyPatchImpl({ workspaceRoot, fs });
-    fs.files.set(path.resolve(workspaceRoot, "a.txt"), "x\n");
+    fs.files.set(path.resolve(workspaceRoot, "app/a/page.config.ts"), "export const config = { elements: [] };\n");
     const res = await applyPatch(`*** Begin Patch
-*** Update File: a.txt
+*** Update File: app/a/page.config.ts
 @@
- x
+ export const config = { elements: [] };
 *** End Patch
 `);
     assert.equal(res.success, true);
     assert.equal(res.changed, false);
-    assert.equal(fs.files.get(path.resolve(workspaceRoot, "a.txt")), "x\n");
+    assert.equal(fs.files.get(path.resolve(workspaceRoot, "app/a/page.config.ts")), "export const config = { elements: [] };\n");
 });
 //# sourceMappingURL=applyPatch.impl.test.js.map

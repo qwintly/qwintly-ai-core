@@ -1,6 +1,7 @@
 import path from "node:path";
 import { applyHunksToContent, isTextFilePath, parseApplyPatch } from "../helpers/applyPatch.helpers.js";
 import { toWorkspacePath } from "../helpers/fileSystem.helpers.js";
+import { isAllowedRouteFilePath, isPageTsxPath, matchesPageTsxTemplate, normalizeFsPathForPolicy, PAGE_TSX_TEMPLATE, } from "../helpers/nextRouteFilePolicy.js";
 export const createApplyPatchImpl = (deps) => {
     const { workspaceRoot, fs, logger } = deps;
     return async (patchString) => {
@@ -57,6 +58,67 @@ export const createApplyPatchImpl = (deps) => {
         try {
             const operations = parseApplyPatch(patchString);
             parsedOps = operations;
+            for (const op of operations) {
+                const opPath = normalizeFsPathForPolicy(op.filePath);
+                if (!isAllowedRouteFilePath(opPath)) {
+                    return {
+                        success: false,
+                        rejected: true,
+                        error: `apply_patch rejected: only route files named "page.tsx" or "page.config.ts" may be modified.\n` +
+                            `Found operation on: "${opPath}"`,
+                        allowed: Array.from(["page.tsx", "page.config.ts"]),
+                    };
+                }
+                if (op.kind === "update" && op.moveTo && op.moveTo !== op.filePath) {
+                    const moveToPath = normalizeFsPathForPolicy(op.moveTo);
+                    if (!isAllowedRouteFilePath(moveToPath)) {
+                        return {
+                            success: false,
+                            rejected: true,
+                            error: `apply_patch rejected: move target must be a route file named "page.tsx" or "page.config.ts".\n` +
+                                `From: "${opPath}"\n` +
+                                `To: "${moveToPath}"`,
+                            allowed: Array.from(["page.tsx", "page.config.ts"]),
+                        };
+                    }
+                    const fromName = opPath.split("/").pop() ?? "";
+                    const toName = moveToPath.split("/").pop() ?? "";
+                    if (fromName !== toName) {
+                        return {
+                            success: false,
+                            rejected: true,
+                            error: `apply_patch rejected: renaming between route file types is not allowed.\n` +
+                                `From: "${opPath}"\n` +
+                                `To: "${moveToPath}"`,
+                        };
+                    }
+                }
+                if (isPageTsxPath(opPath)) {
+                    if (op.kind === "update") {
+                        return {
+                            success: false,
+                            rejected: true,
+                            error: `apply_patch rejected: updates to "page.tsx" are not allowed for any route. ` +
+                                `Only Add File (create) or Delete File is allowed.\n` +
+                                `Path: "${opPath}"`,
+                            rule: "page.tsx is immutable after creation",
+                        };
+                    }
+                    if (op.kind === "add") {
+                        const { content: after } = applyHunksToContent("", op.hunks);
+                        if (!matchesPageTsxTemplate(after)) {
+                            return {
+                                success: false,
+                                rejected: true,
+                                error: `apply_patch rejected: new "page.tsx" must match the exact required template (byte-for-byte).\n` +
+                                    `Path: "${opPath}"\n` +
+                                    `Expected:\n${PAGE_TSX_TEMPLATE}`,
+                                rule: "page.tsx must match template on creation",
+                            };
+                        }
+                    }
+                }
+            }
             let changed = false;
             const warnings = [];
             for (const op of operations) {
