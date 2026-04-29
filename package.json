@@ -29,10 +29,15 @@
   "peerDependencies": {
     "@google/genai": "^1.33.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
+    "@upstash/redis": "^1.37.0",
+    "zod": "^4.3.6",
+    "zod-to-json-schema": "^3.25.2"
+  },
   "devDependencies": {
+    "@google/genai": "^1.33.0",
     "@types/node": "^24.10.4",
-    "typescript": "^5.9.3",
-    "@google/genai": "^1.33.0"
+    "typescript": "^5.9.3"
   }
 }
