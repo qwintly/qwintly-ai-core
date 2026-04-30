@@ -13,7 +13,6 @@ import { statusService } from "./logging/genStatus.service.js";
 import { SendStatusToRedis } from "./logging/redis.service.js";
 import { ContextRepository } from "./repository/context.repository.js";
 import { GenStatusRepository } from "./repository/genStatus.repository.js";
-import { geminiSecretMgr } from "./secretManager/gemini.secretMgr.js";
 import { EventType } from "./types/events.js";
 import {
   CodegenIndex,
@@ -47,6 +46,7 @@ export class QwintlyCore {
     sbEndpoint: string,
     upstashUrl: string,
     upstashToken: string,
+    geminiApiKey: string,
   ) {
     this.chatId = chatId;
     this.sessionId = sessionId;
@@ -57,8 +57,8 @@ export class QwintlyCore {
     this.sbEndpoint = sbEndpoint;
     this.upstashUrl = upstashUrl;
     this.upstashToken = upstashToken;
+    this.geminiApiKey = geminiApiKey;
 
-    this.geminiApiKey = geminiSecretMgr(chatId).geminiApiKey;
     this.aiClient = getClient("gemini", this.geminiApiKey);
 
     this.statusRepo = new GenStatusRepository(this.sbEndpoint, this.sbSecret);
@@ -86,7 +86,7 @@ export class QwintlyCore {
       maxSteps: maxSteps,
       terminalToolNames: terminalToolNames,
       aiCall: this.aiClient.aiCall,
-      logger: this.streamLog,
+      logger: this.streamLog.bind(this),
     };
 
     const result = await runToolLoop(toolLoopOptions);
@@ -116,24 +116,21 @@ export class QwintlyCore {
     return projectInfo;
   }
 
+  private async buildIndex<T>(
+    builder: (path: string) => Promise<T>,
+  ): Promise<T> {
+    return builder(this.workspacePath);
+  }
+
   public async buildPlannerIdx(): Promise<PlannerIndex> {
-    const plannerIndex: PlannerIndex = await buildPlannerIndex(
-      this.workspacePath,
-    );
-    return plannerIndex;
+    return this.buildIndex(buildPlannerIndex);
   }
 
-  public async buildCodegenIds() {
-    const codegenIndex: CodegenIndex = await buildCodegenIndex(
-      this.workspacePath,
-    );
-    return codegenIndex;
+  public async buildCodegenIdx(): Promise<CodegenIndex> {
+    return this.buildIndex(buildCodegenIndex);
   }
 
-  public async buildValidatorIdx() {
-    const ValidatorIndex: ValidatorIndex = await buildValidatorIndex(
-      this.workspacePath,
-    );
-    return ValidatorIndex;
+  public async buildValidatorIdx(): Promise<ValidatorIndex> {
+    return this.buildIndex(buildValidatorIndex);
   }
 }
