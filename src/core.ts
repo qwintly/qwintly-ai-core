@@ -129,25 +129,29 @@ export class QwintlyCore {
   }
 
   public async streamLog(message: string, eventType: EventType): Promise<void> {
-    assertNonEmptyString(message, "message");
-    await statusService(
-      this.chatId,
-      this.sessionId,
-      eventType,
-      this.step,
-      message,
-      this.source,
-      {
-        repository: {
-          persist: this.statusRepo.persistStatusMessage.bind(this.statusRepo),
+    try {
+      assertNonEmptyString(message, "message");
+      await statusService(
+        this.chatId,
+        this.sessionId,
+        eventType,
+        this.step,
+        message,
+        this.source,
+        {
+          repository: {
+            persist: this.statusRepo.persistStatusMessage.bind(this.statusRepo),
+          },
+          publisher: {
+            publish: this.redisStatusPublisher.sendStatusToRedis.bind(
+              this.redisStatusPublisher,
+            ),
+          },
         },
-        publisher: {
-          publish: this.redisStatusPublisher.sendStatusToRedis.bind(
-            this.redisStatusPublisher,
-          ),
-        },
-      },
-    );
+      );
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   public async buildProjectInfoIdx(): Promise<ProjectInfo> {
