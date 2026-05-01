@@ -1,38 +1,58 @@
 {
-  "name": "qwintly-ai-core",
-  "version": "1.0.0",
-  "description": "Qwintly AI Core",
-  "homepage": "https://github.com/qwintly/qwintly-ai-core#readme",
+  "name": "@vedangiitb/qwintly-core",
+  "version": "1.0.4",
+  "description": "Qwintly Core",
+  "homepage": "https://github.com/vedangiitb/qwintly-core#readme",
   "bugs": {
-    "url": "https://github.com/qwintly/qwintly-ai-core/issues"
+    "url": "https://github.com/vedangiitb/qwintly-core/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/qwintly/qwintly-ai-core.git"
+    "url": "git+https://github.com/vedangiitb/qwintly-core.git"
   },
   "license": "ISC",
   "author": "vedangiitb",
   "type": "module",
   "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
   },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc -p tsconfig.json",
     "prepare": "npm run build",
+    "prepack": "npm run clean && npm run build",
     "test": "npm run build && node --test dist"
   },
   "peerDependencies": {
     "@google/genai": "^1.33.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
+    "@upstash/redis": "^1.37.0",
+    "zod": "^4.3.6",
+    "zod-to-json-schema": "^3.25.2"
+  },
   "devDependencies": {
+    "@google/genai": "^1.33.0",
     "@types/node": "^24.10.4",
-    "typescript": "^5.9.3",
-    "@google/genai": "^1.33.0"
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
