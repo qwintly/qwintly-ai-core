@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseApplyPatch } from "./applyPatch.helpers.js";
+import { parseApplyPatch } from "../ai/tools/helpers/applyPatch.helpers.js";
 
 test("parseApplyPatch: tolerates leading indentation (dedent)", () => {
   const patch = `
@@ -53,4 +53,3 @@ test('parseApplyPatch: supports "*** Move to:" after Update File', () => {
   assert.equal(ops[0]?.filePath, "a.txt");
   assert.equal((ops[0] as any).moveTo, "b.txt");
 });
-

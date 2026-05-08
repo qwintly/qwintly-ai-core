@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
-import { toWorkspacePath } from "./fileSystem.helpers.js";
+import { toWorkspacePath } from "../ai/tools/helpers/fileSystem.helpers.js";
 
 test("toWorkspacePath: tolerates case mismatch for absolute paths on Windows", () => {
   if (process.platform !== "win32") {
@@ -14,4 +14,3 @@ test("toWorkspacePath: tolerates case mismatch for absolute paths on Windows", (
   const resolved = toWorkspacePath(workspaceRoot, input);
   assert.equal(resolved, path.resolve(workspaceRoot, "src", "index.ts"));
 });
-

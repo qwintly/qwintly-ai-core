@@ -31,7 +31,7 @@ export type QwintlyCoreOptions = {
   step: GenStep;
   supabase: { endpoint: string; secret: string };
   upstash: { url: string; token: string };
-  gemini: { apiKey: string; model?: string };
+  gemini?: { apiKey: string; model?: string };
 };
 
 type AiResponseOptions = {
@@ -56,7 +56,7 @@ export class QwintlyCore {
   public readonly source: string;
   public readonly step: GenStep;
 
-  private readonly aiClient: AiClient;
+  private readonly aiClient?: AiClient;
   private readonly statusRepo: GenStatusRepository;
   private readonly ctxRepo: ContextRepository;
   private readonly redisStatusPublisher: SendStatusToRedis;
@@ -71,7 +71,6 @@ export class QwintlyCore {
     assertNonEmptyString(options.supabase?.secret, "supabase.secret");
     assertNonEmptyString(options.upstash?.url, "upstash.url");
     assertNonEmptyString(options.upstash?.token, "upstash.token");
-    assertNonEmptyString(options.gemini?.apiKey, "gemini.apiKey");
 
     this.chatId = options.chatId;
     this.sessionId = options.sessionId;
@@ -79,11 +78,13 @@ export class QwintlyCore {
     this.source = options.source;
     this.step = options.step;
 
-    this.aiClient = getClient(
-      "gemini",
-      options.gemini.apiKey,
-      options.gemini.model,
-    ) as AiClient;
+    if (options.gemini?.apiKey) {
+      this.aiClient = getClient(
+        "gemini",
+        options.gemini.apiKey,
+        options.gemini.model,
+      ) as AiClient;
+    }
 
     this.statusRepo = new GenStatusRepository(
       options.supabase.endpoint,
@@ -110,6 +111,11 @@ export class QwintlyCore {
     maxSteps: number,
     terminalToolNames: string[],
   ): Promise<ToolLoopResult> {
+    if (!this.aiClient) {
+      throw new Error(
+        "AI client not initialized. Please provide 'gemini' config to use runAiFlow.",
+      );
+    }
     const toolLoopOptions: RunToolLoopOptions = {
       initialContents: initialContents,
       tools: tools,
@@ -117,7 +123,7 @@ export class QwintlyCore {
       maxSteps: maxSteps,
       terminalToolNames: terminalToolNames,
       aiCall: (request, options) =>
-        this.aiClient.aiResponse(request, {
+        this.aiClient!.aiResponse(request, {
           tools: options.tools,
           toolCallingMode: options.toolCallingMode,
         }),
@@ -128,7 +134,11 @@ export class QwintlyCore {
     return result;
   }
 
-  public async streamLog(message: string, eventType: EventType): Promise<void> {
+  public async streamLog(
+    message: string,
+    eventType: EventType,
+    displayedSummary: boolean = false,
+  ): Promise<void> {
     try {
       assertNonEmptyString(message, "message");
       await statusService(
@@ -148,6 +158,7 @@ export class QwintlyCore {
             ),
           },
         },
+        displayedSummary,
       );
     } catch (error) {
       console.error(error);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
-import { createApplyPatchImpl } from "./applyPatch.impl.js";
+import { createApplyPatchImpl } from "../ai/tools/implementations/applyPatch.impl.js";
 
 type MemFs = {
   files: Map<string, string>;

@@ -37,7 +37,10 @@ export class SendStatusToRedis {
     );
 
     await this.upstashClient.hset(`chat:${chatId}:state:${genId}`, {
-      current_status: event.message,
+      event_type: event.event_type,
+      step: event.step ?? "",
+      message: event.message ?? "",
+      seq_num: event.seq_num.toString(),
       last_seq: event.seq_num.toString(),
     });
   };

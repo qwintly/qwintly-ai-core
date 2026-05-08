@@ -10,6 +10,7 @@ export interface StatusRepository {
     step: GenStep,
     message: string,
     source: string,
+    displayedSummary: boolean,
   ): Promise<PersistedStatusEvent>;
 }
 
@@ -34,6 +35,7 @@ export const statusService = async (
   message: string,
   source: string,
   deps: StatusServiceDeps,
+  displayedSummary: boolean,
 ): Promise<PersistedStatusEvent> => {
   const { repository, publisher } = deps;
 
@@ -51,6 +53,7 @@ export const statusService = async (
       step,
       message,
       source,
+      displayedSummary,
     );
   } catch (error) {
     throw new StatusServiceError(
