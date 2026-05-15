@@ -13,6 +13,7 @@ export const buildValidatorIndex = async (
       frameworkConfig: projectConfigs.frameworkConfig,
       runtimeConfig: projectConfigs.runtimeConfig,
       toolingConfig: projectConfigs.toolingConfig,
+      renderingConfig: projectConfigs.renderingConfig,
     },
   };
 };

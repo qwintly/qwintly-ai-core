@@ -6,6 +6,7 @@ import {
   ToolHandler,
   ToolLoopResult,
 } from "./ai/toolLoop/toolLoopRunner.js";
+import { initUnsplash } from "./image/unsplash.service.js";
 import { buildCodegenIndex } from "./indexer/codegenIndex.js";
 import { buildPlannerIndex } from "./indexer/plannerIndex.js";
 import { computeProjectInfo } from "./indexer/projectInfoIndex.js";
@@ -31,6 +32,7 @@ export type QwintlyCoreOptions = {
   step: GenStep;
   supabase: { endpoint: string; secret: string };
   upstash: { url: string; token: string };
+  unsplash: { url: string; accessKey: string };
   gemini?: { apiKey: string; model?: string };
 };
 
@@ -77,6 +79,13 @@ export class QwintlyCore {
     this.workspacePath = options.workspacePath;
     this.source = options.source;
     this.step = options.step;
+
+    if (options.unsplash?.url && options.unsplash?.accessKey) {
+      initUnsplash({
+        url: options.unsplash.url,
+        accessKey: options.unsplash.accessKey,
+      });
+    }
 
     if (options.gemini?.apiKey) {
       this.aiClient = getClient(

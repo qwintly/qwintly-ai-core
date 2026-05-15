@@ -1,17 +1,10 @@
-import {
-  projectConfigs,
-  projectConventions,
-} from "../../indexer/data/configs.constants.js";
+import { projectConfigs } from "../../indexer/data/configs.constants.js";
 
 export type CodegenIndex = {
   folderTree: string;
   projectConfigs: Pick<
     typeof projectConfigs,
-    "frameworkConfig" | "runtimeConfig"
-  >;
-  projectConventions: Pick<
-    typeof projectConventions,
-    "importsConventions" | "uiArchitecture"
+    "frameworkConfig" | "runtimeConfig" | "renderingConfig"
   >;
 };
 
@@ -19,14 +12,7 @@ export type PlannerIndex = {
   folderTree: string;
   projectConfigs: Pick<
     typeof projectConfigs,
-    "frameworkConfig" | "runtimeConfig" | "toolingConfig"
-  >;
-  projectConventions: Pick<
-    typeof projectConventions,
-    | "folderConventions"
-    | "importsConventions"
-    | "routingConventions"
-    | "namingConventions"
+    "frameworkConfig" | "runtimeConfig" | "toolingConfig" | "renderingConfig"
   >;
 };
 
@@ -34,6 +20,6 @@ export type ValidatorIndex = {
   folderTree: string;
   projectConfigs: Pick<
     typeof projectConfigs,
-    "frameworkConfig" | "runtimeConfig" | "toolingConfig"
+    "frameworkConfig" | "runtimeConfig" | "toolingConfig" | "renderingConfig"
   >;
 };

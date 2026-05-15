@@ -1,8 +1,5 @@
 import { CodegenIndex } from "../types/index/index.types.js";
-import {
-  projectConfigs,
-  projectConventions,
-} from "./data/configs.constants.js";
+import { projectConfigs } from "./data/configs.constants.js";
 import { buildFolderTree } from "./helpers/buildFolderTree.js";
 
 export const buildCodegenIndex = async (
@@ -15,10 +12,7 @@ export const buildCodegenIndex = async (
     projectConfigs: {
       frameworkConfig: projectConfigs.frameworkConfig,
       runtimeConfig: projectConfigs.runtimeConfig,
-    },
-    projectConventions: {
-      importsConventions: projectConventions.importsConventions,
-      uiArchitecture: projectConventions.uiArchitecture,
+      renderingConfig: projectConfigs.renderingConfig,
     },
   };
 };
