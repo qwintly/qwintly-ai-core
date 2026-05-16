@@ -36,6 +36,7 @@ Tool call:
 
 Notes:
 - Always pass a complete \`className\` string (Tailwind only).
+- Use \`children\` to nest elements; children can themselves have \`children\` (deep nesting is supported).
 - Use the returned \`inserted_id\` for follow-up updates.`,
 
   `### Example: \`update_classname\` (replace className fully)

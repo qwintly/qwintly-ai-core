@@ -68,10 +68,10 @@ ${projectStateNote(isNewProject, "codegen")}
   submit_codegen_done: Use when you are done with the task and want to submit the codegen to the backend for validation.
 
   Important things to note:
-  1. If a route doesn't exists, please create it using the create_new_route tool.
-  2. When you are adding an image, just give the alt, which should be clear description of the image. The src of the image will be taken care by us.
-  3. For icons use only lucide-react icons.
-
+  1. If you want to insert an element to a route, use only 1 insert_element call with all its children. DO NOT use multiple insert_element calls for inserting children for an element.
+  2. If a route doesn't exists, please create it using the create_new_route tool.
+  3. When you are adding an image, just give the alt, which should be clear description of the image. The src of the image will be taken care by us.
+  4. For icons use only lucide-react icons.
   `,
   );
 

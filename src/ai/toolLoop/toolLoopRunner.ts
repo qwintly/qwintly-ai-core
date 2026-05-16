@@ -14,6 +14,7 @@ import {
   recordToolEvent,
   serializeError,
 } from "./toolLoopRunnerUtils.js";
+import { persistToolCall } from "../../services/toolcallPersist.service.js";
 
 export type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
 
@@ -258,7 +259,16 @@ export async function runToolLoop(
           note: readFileMeta.wasCapped
             ? `Capped to ${policy.readFileDefaultMaxLines} lines. Request more with start_line/end_line.`
             : undefined,
-        };
+          };
+      }
+
+      try {
+        await persistToolCall(name, modelArgs, toolResult);
+      } catch (err) {
+        console.error("Tool loop: failed to persist tool call", err, {
+          tool: name,
+          step: step + 1,
+        });
       }
 
       const responseFull = {

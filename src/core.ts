@@ -23,6 +23,7 @@ import {
 } from "./types/index/index.types.js";
 import type { ProjectInfo } from "./types/projectInfo.types.js";
 import { assertNonEmptyString } from "./utils/utils.js";
+import { initializeToolCallsRepository } from "./services/toolcallPersist.service.js";
 
 export type QwintlyCoreOptions = {
   chatId: string;
@@ -106,6 +107,11 @@ export class QwintlyCore {
     this.redisStatusPublisher = new SendStatusToRedis(
       options.upstash.url,
       options.upstash.token,
+    );
+    initializeToolCallsRepository(
+      options.supabase.endpoint,
+      options.supabase.secret,
+      options.sessionId,
     );
 
     console.log(

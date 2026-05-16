@@ -1,5 +1,6 @@
 import { resolveUnsplashImagesDeep } from "../../../image/unsplash.service.js";
 import type { BuilderElement } from "../../../types/elements.js";
+import { InsertElementArgsZod } from "../validators/builderElement.zod.js";
 import {
   ensureElementIds,
   extractAllIdsDeep,
@@ -15,6 +16,19 @@ export const createInsertElementImpl = (deps: WorkspaceDeps) => {
   const { workspaceRoot, fs } = deps;
 
   return async (route: string, parentId: string, element: BuilderElement) => {
+    const parsedArgs = InsertElementArgsZod.safeParse({
+      route,
+      parent_id: parentId,
+      element,
+    });
+    if (!parsedArgs.success) {
+      return {
+        success: false,
+        error: "invalid args",
+        error_detail: parsedArgs.error.flatten(),
+      };
+    }
+
     const parent_id = String(parentId ?? "").trim();
     if (!parent_id) return { success: false, error: "invalid parent_id" };
 

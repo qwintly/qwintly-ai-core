@@ -38,97 +38,107 @@ const OnClickActionSchema = {
   required: ["kind"],
 };
 
-// Self-referential schema (children.items -> BuilderElementSchema)
-export const BuilderElementSchema: any = {
+const BuilderElementPropsSchema = {
   type: Type.OBJECT,
   properties: {
+    onClick: OnClickActionSchema,
+    text: {
+      type: Type.STRING,
+      description:
+        "Text content used by 'text' (<p>), 'button' (label), and as a fallback for 'link' when it has no children.",
+    },
+    href: {
+      type: Type.STRING,
+      description: "For 'link': the href attribute (defaults to '#').",
+    },
+    placeholder: {
+      type: Type.STRING,
+      description: "For 'input' and 'textarea': placeholder shown when empty.",
+    },
+    alt: {
+      type: Type.STRING,
+      description:
+        "For 'image': alt text for accessibility AND the query used to fetch a suitable Unsplash image (src is auto-resolved from alt).",
+    },
+    target: {
+      type: Type.STRING,
+      description: "For 'link': target attribute (e.g. '_blank').",
+    },
+    rel: {
+      type: Type.STRING,
+      description: "For 'link': rel attribute (e.g. 'noreferrer').",
+    },
+    value: {
+      type: Type.STRING,
+      description:
+        "For 'input' and 'textarea': default value (maps to defaultValue).",
+    },
     type: {
       type: Type.STRING,
-      enum: ELEMENT_TYPES,
       description:
-        "Element type to render. 'text' renders a <p>, 'image' renders an <img>, 'link' renders an <a>, 'icon' renders a Lucide icon, 'fragment' renders children only.",
+        "For 'input': input type (e.g. 'text', 'email', 'password'). Defaults to 'text'.",
     },
-    className: {
-      type: Type.STRING,
-      description:
-        "Tailwind CSS className applied to the rendered element (Tailwind only).",
-    },
-    visible: {
-      type: Type.BOOLEAN,
-      description: "Whether the element should be shown.",
-    },
-    props: {
-      type: Type.OBJECT,
-      properties: {
-        onClick: OnClickActionSchema,
-        text: {
-          type: Type.STRING,
-          description:
-            "Text content used by 'text' (<p>), 'button' (label), and as a fallback for 'link' when it has no children.",
-        },
-        href: {
-          type: Type.STRING,
-          description: "For 'link': the href attribute (defaults to '#').",
-        },
-        placeholder: {
-          type: Type.STRING,
-          description:
-            "For 'input' and 'textarea': placeholder shown when empty.",
-        },
-        alt: {
-          type: Type.STRING,
-          description:
-            "For 'image': alt text for accessibility AND the query used to fetch a suitable Unsplash image (src is auto-resolved from alt).",
-        },
-        target: {
-          type: Type.STRING,
-          description: "For 'link': target attribute (e.g. '_blank').",
-        },
-        rel: {
-          type: Type.STRING,
-          description: "For 'link': rel attribute (e.g. 'noreferrer').",
-        },
-        value: {
-          type: Type.STRING,
-          description:
-            "For 'input' and 'textarea': default value (maps to defaultValue).",
-        },
-        type: {
-          type: Type.STRING,
-          description:
-            "For 'input': input type (e.g. 'text', 'email', 'password'). Defaults to 'text'.",
-        },
 
-        // icon
-        name: {
-          type: Type.STRING,
-          description:
-            "For 'icon': Lucide icon name (e.g. 'ArrowRight', 'Menu').",
-        },
-        size: { type: Type.NUMBER, description: "For 'icon': size in px." },
-        color: { type: Type.STRING, description: "For 'icon': stroke color." },
-        strokeWidth: {
-          type: Type.NUMBER,
-          description: "For 'icon': stroke width.",
-        },
-      },
+    // icon
+    name: {
+      type: Type.STRING,
+      description: "For 'icon': Lucide icon name (e.g. 'ArrowRight', 'Menu').",
     },
-    children: {
-      type: Type.ARRAY,
-      description:
-        "Nested children. Used by 'fragment' and 'div' directly, and by 'button'/'link' when present (otherwise they use props.text).",
-      items: {},
+    size: { type: Type.NUMBER, description: "For 'icon': size in px." },
+    color: { type: Type.STRING, description: "For 'icon': stroke color." },
+    strokeWidth: {
+      type: Type.NUMBER,
+      description: "For 'icon': stroke width.",
     },
   },
-  required: ["type"],
 };
 
-BuilderElementSchema.properties.children.items = BuilderElementSchema;
+// NOTE: Gemini tool `parameters` schemas reject `$ref`, so true recursion isn't available here.
+// We unroll nesting to a reasonable max depth; for deeper trees, insert in multiple steps.
+const buildBuilderElementSchema = (depth: number): any => {
+  return {
+    type: Type.OBJECT,
+    properties: {
+      type: {
+        type: Type.STRING,
+        enum: ELEMENT_TYPES,
+        description:
+          "Element type to render. 'text' renders a <p>, 'image' renders an <img>, 'link' renders an <a>, 'icon' renders a Lucide icon, 'fragment' renders children only.",
+      },
+      className: {
+        type: Type.STRING,
+        description:
+          "Tailwind CSS className applied to the rendered element (Tailwind only).",
+      },
+      visible: {
+        type: Type.BOOLEAN,
+        description: "Whether the element should be shown.",
+      },
+      props: BuilderElementPropsSchema,
+      children: {
+        type: Type.ARRAY,
+        description:
+          "Nested children. Each child is another element and can itself have children (children[].children[]...).",
+        items:
+          depth > 0
+            ? buildBuilderElementSchema(depth - 1)
+            : {
+                type: Type.OBJECT,
+                description:
+                  "Max depth reached in tool schema. If you need deeper nesting, insert the parent first, then insert children using the returned inserted_id as parent_id.",
+              },
+      },
+    },
+    required: ["type"],
+  };
+};
+
+export const BuilderElementSchema: any = buildBuilderElementSchema(6);
 
 export const InsertElementSchema = {
   name: "insert_element",
   description:
-    "Inserts element code. The element should be valid following the BuilderElement schema.",
+    "Inserts element code. Use element.children to create nested UI. Each child is another BuilderElement and can itself have children.",
   parameters: {
     type: Type.OBJECT,
     properties: {
