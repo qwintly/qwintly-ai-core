@@ -25,7 +25,14 @@ export const projectConfigs = {
   renderingConfig: {
     approach: "config-driven UI rendering",
     routeConventions: {
-      model: "Every route is driven by a colocated JSON config file.",
+      model:
+        "Routes mean URL paths (e.g. /about, /pricing) in a Next.js App Router app. Each URL route is implemented by a route folder under /app (e.g. app/about) and is driven by a colocated JSON config file.",
+      definition:
+        'In this repo, "route" always refers to the user-facing browser URL pathname, not an arbitrary file path.',
+      examples: {
+        urlRoutes: ["/", "/about", "/pricing"],
+        appRouterFolders: ["app/page.tsx", "app/about/page.tsx", "app/pricing/page.tsx"],
+      },
       filesPerRoute: ["page.tsx", "pageConfig.json"],
       sourceOfTruth:
         "pageConfig.json (edit this; page.tsx is a fixed renderer)",
@@ -34,6 +41,8 @@ export const projectConfigs = {
         root: { elements: "BuilderElement[]" },
         note: "The page renders config.elements (array of BuilderElement).",
       },
+      locationNote:
+        "These files live inside the route folder (App Router convention). Example: for /about -> app/about/page.tsx and app/about/pageConfig.json.",
     },
     pageRenderer: {
       fileName: "page.tsx",
@@ -74,11 +83,15 @@ export default function Page() {
     },
     generatorGuidance: {
       do: [
-        "UI changes can happen only by editing the route's pageConfig.json elements tree.",
+        "Treat a route as a URL path (e.g. /about). Its code lives in the corresponding Next.js App Router folder (e.g. app/about).",
+        "UI changes can happen only by editing that route folder's pageConfig.json elements tree.",
+        "@/lib/renderer/RenderElement , @/types/elements already exist. No need to create them.",
+        "When creating a new URL route (e.g. /pricing), create the App Router folder (e.g. app/pricing) with page.tsx (fixed renderer) + pageConfig.json (initial elements). After that, codegen should only modify pageConfig.json.",
         "Use Tailwind in className; prefer composition via nested children.",
       ],
       dont: [
-        "Do not change page.tsx structure for routes (it is a fixed renderer).",
+        "Do not confuse URL routes with file paths; do not invent 'routes' that are just filenames.",
+        "Do not change page.tsx structure for URL routes (it is a fixed renderer).",
         "Do not generate React components for layout; encode structure in JSON elements.",
       ],
     },
