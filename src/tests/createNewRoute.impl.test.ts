@@ -34,10 +34,15 @@ test("create_new_route: creates page.tsx and pageConfig.json under /app", async 
 
     const impl = createCreateNewRouteImpl({ workspaceRoot, fs: makeRealFs() } as any);
     const res = await impl("/dashboard", "settings");
-    assert.equal(
-      res,
-      `created page.tsx successfully and content of pageConfig.json at route \"/dashboard/settings\":\n${DEFAULT_PAGE_CONFIG_JSON}`,
-    );
+    assert.deepEqual(res, {
+      success: true,
+      route: "/dashboard/settings",
+      created_files: [
+        "app/dashboard/settings/page.tsx",
+        "app/dashboard/settings/pageConfig.json",
+      ],
+      page_config_json: JSON.parse(DEFAULT_PAGE_CONFIG_JSON),
+    });
 
     const pageTsx = await fs.readFile(
       path.join(workspaceRoot, "app", "dashboard", "settings", "page.tsx"),
@@ -72,7 +77,7 @@ test("create_new_route: atomic rollback on write failure", async () => {
 
     const impl = createCreateNewRouteImpl({ workspaceRoot, fs: failingFs } as any);
     const res = await impl("/dashboard", "settings");
-    assert.equal(res, "failed to create");
+    assert.equal((res as any)?.success, false);
 
     const entries = await fs.readdir(parentDir);
     assert.ok(!entries.includes("settings"), "final route dir should not exist");
@@ -91,7 +96,7 @@ test("create_new_route: fails when parent route folder does not exist", async ()
     await fs.mkdir(path.join(workspaceRoot, "app"), { recursive: true });
     const impl = createCreateNewRouteImpl({ workspaceRoot, fs: makeRealFs() } as any);
     const res = await impl("/does-not-exist", "settings");
-    assert.equal(res, "failed to create");
+    assert.deepEqual(res, { success: false, error: "Parent route missing" });
   } finally {
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }

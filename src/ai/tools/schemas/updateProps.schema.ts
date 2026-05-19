@@ -27,7 +27,7 @@ const OnClickActionSchema = {
 };
 
 export const UpdatePropsSchema = {
-  name: "update_element",
+  name: "update_props",
   description: "Updates element code.",
   parameters: {
     type: Type.OBJECT,

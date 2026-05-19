@@ -9,7 +9,7 @@ export const CreateNewRouteSchema = {
     properties: {
       parent_route: {
         type: Type.STRING,
-        description: 'The parent route ("/" for app root). Example: "/" or "/dashboard".',
+        description: 'The parent route ("/" for app root). Example: "/" or "/dashboard". NEVER pass empty string, use "/" if not sure about parent route.',
       },
       route_name: {
         type: Type.STRING,

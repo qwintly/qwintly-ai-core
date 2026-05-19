@@ -2,7 +2,6 @@ import { ValidatorIndex } from "../../types/public.js";
 import {
   jsonBlock,
   mdSection,
-  plannerObjectives,
   renderPlannerTaskFormatSection,
 } from "./helpers/promptParts.helper.js";
 
@@ -19,83 +18,74 @@ export type ValidationNodePromptParams = {
 export const validatorPrompt = (params: ValidationNodePromptParams) => {
   const { errors, history, validatorIndex } = params;
 
-  const initialPrompt = `You are a senior software engineer.
-Based on the provided validation errors and fix history, generate a detailed technical implementation plan.
-Provide precise, step-by-step instructions for a code-generation agent; ensure tasks are explicit and highly granular.
-    `.trim();
+  const system = `
+    You are a senior software engineer creating fix tasks for validation failures.
 
-  const objectives = plannerObjectives("validator");
-
-  const projectConfiguration = mdSection(
-    "Project Configuration",
-    [
-      jsonBlock(
-        "FRAMEWORK CONFIG",
-        validatorIndex.projectConfigs.frameworkConfig,
-      ),
-      jsonBlock("RUNTIME CONFIG", validatorIndex.projectConfigs.runtimeConfig),
-      jsonBlock("TOOLING CONFIG", validatorIndex.projectConfigs.toolingConfig),
-      jsonBlock(
-        "RENDERING CONFIGURATION",
-        validatorIndex.projectConfigs.renderingConfig,
-      ),
-    ].join("\n"),
-  );
+    Rules:
+    - Fix ALL validation errors.
+    - Create atomic, deterministic tasks.
+    - Include exact file paths.
+    - Prefer incremental edits over rewrites.
+    - Reuse existing code/patterns.
+    - Be concise but complete.
+    - Do not write code.
+    - Tasks must be directly executable by codegen agents.
+  `.trim();
 
   const renderedErrors =
     errors.length === 0
-      ? "- No validation errors were provided."
+      ? "none"
       : errors
-          .map(
-            (error) =>
-              `- Type: ${error.type}\n  File: ${error.filePath}\n  Message: ${error.message}`,
-          )
+          .map((e) => `type:${e.type} file:${e.filePath} msg:${e.message}`)
           .join("\n");
 
   const renderedHistory =
     history.length === 0
-      ? "- No previous fixes attempted."
-      : history
-          .map((h) => `- File: ${h.file}\n  Fix Attempted: ${h.fix}`)
-          .join("\n");
+      ? "none"
+      : history.map((h) => `file:${h.file} fix:${h.fix}`).join("\n");
 
   const errorsInfo = mdSection(
-    "Inputs (Authoritative)",
+    "Validation",
     `
-Validation Errors:
-${renderedErrors}
+      Errors:
+      ${renderedErrors}
 
-Fix History:
-${renderedHistory}
-
-      `.trim(),
+      History:
+      ${renderedHistory}
+    `.trim(),
   );
 
   const toolsInfo = mdSection(
     "Tools",
-
     `
-    You are provided access to the following tools and use them to plan coding tasks.
-    
-    read_file: Use it to read a file from the codebase.
-
-    search: Use it to search for code in the codebase.
-    
-    list_dir: Use it to list the directory structure of the codebase.
-        
-    submit_planner_tasks: Use it to finalize and return the planner tasks for the code-generation agent.
-    `,
+      - read_file: read file
+      - search: search codebase
+      - list_dir: list dirs
+      - submit_planner_tasks: submit tasks
+    `.trim(),
   );
 
   const rendering = renderPlannerTaskFormatSection();
 
+  const projectConfiguration = mdSection(
+    "Project Config",
+    [
+      jsonBlock("framework", validatorIndex.projectConfigs.frameworkConfig),
+
+      jsonBlock("runtime", validatorIndex.projectConfigs.runtimeConfig),
+
+      jsonBlock("tooling", validatorIndex.projectConfigs.toolingConfig),
+
+      jsonBlock("rendering", validatorIndex.projectConfigs.renderingConfig),
+    ].join("\n"),
+  );
+
   const sections = [
-    initialPrompt,
-    objectives,
-    projectConfiguration,
+    system,
+    errorsInfo,
     toolsInfo,
     rendering,
-    errorsInfo,
+    projectConfiguration,
   ];
 
   return sections.join("\n\n---\n\n");

@@ -1,4 +1,4 @@
-import { CodegenIndex, CollectedContext, PlanTask } from "../../types/public.js";
+import { CodegenIndex, CollectedContext } from "../../types/public.js";
 import { codegenExamples } from "./examples/codegen.examples.js";
 import {
   jsonBlock,
@@ -16,79 +16,70 @@ export type CodegenNodePromptParams = {
 export const codegenPrompt = (params: CodegenNodePromptParams) => {
   const { task, codegenIndex, collectedContext, isNewProject } = params;
 
-  const intialPrompt = `You are a senior software engineer responsible for implementing ONE coding task precisely and safely within an existing codebase.
-${projectStateNote(isNewProject, "codegen")}
-    `;
+  const system = `
+    You are a senior software engineer implementing tasks in an existing codebase.
 
-  const context = mdSection(
-    "Context (Authoritative)",
-    [
-      jsonBlock(
-        "Project Context (User preferences etc.)",
-        collectedContext ?? {},
-      ),
-    ].join("\n"),
-  );
+    Rules:
+    - Implement ONLY the requested task.
+    - Prefer incremental edits over rewrites.
+    - Be concise and deterministic.
+    - Do not output code directly; use tools.
 
-  const projectConfiguration = mdSection(
-    "Project Configuration",
-    [
-      jsonBlock(
-        "FRAMEWORK CONFIG",
-        codegenIndex.projectConfigs.frameworkConfig,
-      ),
-      jsonBlock("RUNTIME CONFIG", codegenIndex.projectConfigs.runtimeConfig),
-      jsonBlock(
-        "RENDERING CONFIGURATION",
-        codegenIndex.projectConfigs.renderingConfig,
-      ),
-    ].join("\n"),
+    ${projectStateNote(isNewProject, "codegen")}
+  `.trim();
+
+  const taskInfo = mdSection(
+    "Task to implement",
+    jsonBlock("task", task ?? null),
   );
 
   const toolsInfo = mdSection(
-    "Tool Usage",
-
+    "Tools",
     `
-  You are provided access to the following tools and use them to implement coding tasks.
+      Available tools:
 
-  read_file: Use when you want to read a file from the codebase.
+      - read_file: Read file
+      - list_dir: List directory
+      - create_new_route: Create route with page.tsx + pageConfig.json
+      - insert_element: Insert element tree
+      - delete_element: Delete element
+      - update_classname: Update className
+      - update_props: Update props
+      - submit_codegen_done: Finish task
 
-  list_dir: Use when you want to list the directory structure of a given path.
-
-  create_new_route: Use when you want to create a new route. It will create a new route with a page.tsx and pageConfig.json (initial contents) file.
-  
-  insert_element: Use when you want to insert a new element in the config
-  
-  delete_element: Use when you want to delete an element from the config.
-
-  update_classname: Use when you want to update the className of an element.
-  
-  update_props: Use when you want to update the props of an element.
-
-  submit_codegen_done: Use when you are done with the task and want to submit the codegen to the backend for validation.
-
-  Important things to note:
-  1. If you want to insert an element to a route, use only 1 insert_element call with all its children. DO NOT use multiple insert_element calls for inserting children for an element.
-  2. If a route doesn't exists, please create it using the create_new_route tool.
-  3. When you are adding an image, just give the alt, which should be clear description of the image. The src of the image will be taken care by us.
-  4. For icons use only lucide-react icons.
-  `,
+      Rules:
+      - One insert_element per tree (include children inline) unless depth blocks it.
+      - Create missing routes with create_new_route.
+      - For any tool arg named route, always use URL paths with forward slashes (e.g. '/', '/pricing'); never use '\\' or filesystem paths like 'app/pricing'.
+      - image src auto-generated from alt
+      - lucide-react icons only
+    `.trim(),
   );
 
-  const taskInfo = mdSection(
-    "Task (Authoritative)",
-    jsonBlock("TASK (You need to implement)", task ?? null),
+  const projectConfiguration = mdSection(
+    "Project Config",
+    [
+      jsonBlock("framework", codegenIndex.projectConfigs.frameworkConfig),
+
+      jsonBlock("runtime", codegenIndex.projectConfigs.runtimeConfig),
+
+      jsonBlock("rendering", codegenIndex.projectConfigs.renderingConfig),
+    ].join("\n"),
   );
 
-  const examples = codegenExamples;
+  const context = mdSection(
+    "Relevant Context",
+    jsonBlock("context", collectedContext ?? {}),
+  );
 
   const sections = [
-    intialPrompt,
-    context,
-    projectConfiguration,
-    toolsInfo,
-    examples,
+    system,
     taskInfo,
+    toolsInfo,
+    projectConfiguration,
+    context,
+    codegenExamples,
   ];
+
   return sections.join("\n\n---\n\n");
 };

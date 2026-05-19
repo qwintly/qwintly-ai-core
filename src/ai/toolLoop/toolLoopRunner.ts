@@ -1,4 +1,5 @@
 import { FunctionCallingConfigMode, Tool } from "@google/genai";
+import { persistToolCall } from "../../services/toolcallPersist.service.js";
 import { EVENT_TYPES, EventType } from "../../types/events.js";
 import {
   compactForModel,
@@ -14,7 +15,6 @@ import {
   recordToolEvent,
   serializeError,
 } from "./toolLoopRunnerUtils.js";
-import { persistToolCall } from "../../services/toolcallPersist.service.js";
 
 export type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
 
@@ -106,6 +106,26 @@ export async function runToolLoop(
   };
 
   for (let step = 0; step < maxSteps; step++) {
+    const remaining = maxSteps - step;
+
+    const budgetInstruction = {
+      role: "user",
+      parts: [
+        {
+          text:
+            `Execution limit: ${remaining} turn(s) remaining including this one. ` +
+            `One turn = one assistant response in the tool loop. ` +
+            `Complete the task in as few turns as possible and avoid unnecessary actions. Prioritize correctness` +
+            `${remaining <= 5 ? `Approaching execution limit. Only ${remaining} turns left` : ""}`,
+        },
+      ],
+    };
+
+    if (keepFullTrace) {
+      fullTraceContents.push(budgetInstruction);
+    }
+    modelContents.push(budgetInstruction);
+
     modelContents = compactForModel({
       initialCount: initialContents.length,
       modelContents,
@@ -243,23 +263,33 @@ export async function runToolLoop(
 
       if (name === "read_file" && readFileMeta) {
         const path = String(effectiveArgs.path ?? "");
-        const rawContent =
-          typeof (toolResultRaw as any)?.content === "string"
-            ? String((toolResultRaw as any).content)
-            : typeof toolResultRaw === "string"
-              ? toolResultRaw
-              : JSON.stringify(toolResultRaw ?? null);
 
-        toolResult = {
-          path,
-          start_line: readFileMeta.start,
-          end_line: readFileMeta.end,
-          truncated: readFileMeta.wasCapped,
-          content: rawContent,
-          note: readFileMeta.wasCapped
-            ? `Capped to ${policy.readFileDefaultMaxLines} lines. Request more with start_line/end_line.`
-            : undefined,
+        const jsonPayload =
+          (toolResultRaw as any)?.kind === "json"
+            ? (toolResultRaw as any)?.json
+            : undefined;
+        if (jsonPayload !== undefined) {
+          // Token-efficient: return JSON as structured data (no double-stringifying).
+          toolResult = { path, json: jsonPayload };
+        } else {
+          const rawContent =
+            typeof (toolResultRaw as any)?.content === "string"
+              ? String((toolResultRaw as any).content)
+              : typeof toolResultRaw === "string"
+                ? toolResultRaw
+                : JSON.stringify(toolResultRaw ?? null);
+
+          toolResult = {
+            path,
+            start_line: readFileMeta.start,
+            end_line: readFileMeta.end,
+            truncated: readFileMeta.wasCapped,
+            content: rawContent,
+            note: readFileMeta.wasCapped
+              ? `Capped to ${policy.readFileDefaultMaxLines} lines. Request more with start_line/end_line.`
+              : undefined,
           };
+        }
       }
 
       try {
@@ -356,5 +386,10 @@ export async function runToolLoop(
     }
   }
 
-  throw new Error(`Tool loop: max steps reached (${maxSteps}).`);
+  return {
+    contents: keepFullTrace ? fullTraceContents : modelContents,
+    modelContents,
+    finalText: `Stopped: max steps reached (${maxSteps}).`,
+    steps: maxSteps,
+  };
 }

@@ -60,6 +60,7 @@ function scoreImage(photo: any) {
 export async function searchUnsplashImage(
   imgQuery: string,
 ): Promise<ResolvedImage | null> {
+  console.log("searchUnsplashImage", imgQuery);
   const cfg = unsplashConfig;
   if (!cfg) throw new Error("Unsplash not configured");
 

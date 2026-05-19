@@ -4,7 +4,6 @@ import { plannerExamples } from "./examples/planner.examples.js";
 import {
   jsonBlock,
   mdSection,
-  plannerObjectives,
   projectStateNote,
   renderPlannerTaskFormatSection,
 } from "./helpers/promptParts.helper.js";
@@ -19,79 +18,63 @@ export type PlanNodePromptParams = {
 export const plannerPrompt = (params: PlanNodePromptParams) => {
   const { planTasks, collectedContext, plannerIndex, isNewProject } = params;
 
-  const intialPrompt = `
-You are a senior software architect.
-Based on the provided PM plan and code context, generate a detailed technical implementation plan.
-Provide precise, step-by-step instructions for a code-generation agent; ensure tasks are explicit, atomic, and ordered.
-${projectStateNote(isNewProject, "planner")}
-    `.trim();
+  const system = `
+    You are a senior software architect creating implementation tasks.
 
-  const objectives = plannerObjectives("planner");
+    Rules:
+    - Create atomic, deterministic tasks.
+    - Include exact file paths to create/modify.
+    - Prefer incremental edits over rewrites.
+    - Reuse existing code/patterns.
+    - Be concise but complete.
+    - Do not write code.
+    - Tasks must be directly executable by codegen agents.
 
-  const context = mdSection(
-    "Inputs (Authoritative)",
-    [
-      jsonBlock(
-        "Project Context (User preferences etc.)",
-        collectedContext ?? {},
-      ),
-    ].join("\n"),
-  );
-
-  const projectConfiguration = mdSection(
-    "Project Configuration",
-    [
-      jsonBlock(
-        "FRAMEWORK CONFIG",
-        plannerIndex.projectConfigs.frameworkConfig,
-      ),
-      jsonBlock("RUNTIME CONFIG", plannerIndex.projectConfigs.runtimeConfig),
-      jsonBlock("TOOLING CONFIG", plannerIndex.projectConfigs.toolingConfig),
-      jsonBlock(
-        "RENDERING CONFIGURATION",
-        plannerIndex.projectConfigs.renderingConfig,
-      ),
-    ].join("\n"),
+    ${projectStateNote(isNewProject, "planner")}
+  `.trim();
+  const planTasksInfo = mdSection(
+    "PM Tasks",
+    jsonBlock("Tasks", planTasks ?? []),
   );
 
   const toolsInfo = mdSection(
     "Tools",
-
     `
-    You are provided access to the following tools and use them to plan coding tasks.
-    
-    read_file: Use it to read a file from the codebase.
-
-    search: Use it to search for code in the codebase.
-    
-    list_dir: Use it to list the directory structure of the codebase.
-        
-    submit_planner_tasks: Use it to finalize and return the planner tasks for the code-generation agent.
+      - read_file: read file
+      - search: search codebase
+      - list_dir: list dirs
+      - submit_planner_tasks: Finalize planner output
     `,
-  );
-
-  const planTasksInfo = mdSection(
-    "Plan Tasks",
-    jsonBlock("Plan Tasks", planTasks ?? []),
   );
 
   const rendering = renderPlannerTaskFormatSection();
 
-  const examples = plannerExamples;
+  const projectConfiguration = mdSection(
+    "Project Config",
+    [
+      jsonBlock("framework", plannerIndex.projectConfigs.frameworkConfig),
 
-  const plannerClosingNote =
-    "Focus on clarity, minimalism, and correctness. Your plan will directly determine the success of the system.";
+      jsonBlock("runtime", plannerIndex.projectConfigs.runtimeConfig),
+
+      jsonBlock("tooling", plannerIndex.projectConfigs.toolingConfig),
+
+      jsonBlock("rendering", plannerIndex.projectConfigs.renderingConfig),
+    ].join("\n"),
+  );
+
+  const context = mdSection(
+    "Relevant Context",
+    jsonBlock("context", collectedContext ?? {}),
+  );
 
   const sections = [
-    intialPrompt,
-    objectives,
-    context,
-    projectConfiguration,
+    system,
+    planTasksInfo,
     toolsInfo,
     rendering,
-    examples,
-    planTasksInfo,
-    plannerClosingNote,
+    projectConfiguration,
+    context,
+    plannerExamples,
   ];
 
   return sections.join("\n\n---\n\n");

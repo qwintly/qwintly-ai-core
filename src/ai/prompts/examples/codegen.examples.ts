@@ -57,7 +57,7 @@ Notes:
   `### Example: \`update_props\` (update element props)
 Goal: Update the text and click action for a button.
 
-Tool call (function name in tool schema is \`update_element\`):
+Tool call (function name in tool schema is \`update_props\`):
 \`\`\`json
 {
   "route": "/",

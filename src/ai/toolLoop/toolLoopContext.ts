@@ -14,7 +14,7 @@ export type ToolLoopContextPolicy = {
 
 export const DEFAULT_CONTEXT_POLICY: Required<ToolLoopContextPolicy> = {
   readFileDefaultMaxLines: 200,
-  tailMessages: 12,
+  tailMessages: 6,
   maxModelChars: 120_000,
   logApproxModelChars: false,
 };

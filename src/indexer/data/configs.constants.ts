@@ -23,46 +23,42 @@ export const projectConfigs = {
     testing: "none",
   },
   renderingConfig: {
-    approach: "config-driven UI rendering",
-    routeConventions: {
-      model:
-        "Routes mean URL paths (e.g. /about, /pricing) in a Next.js App Router app. Each URL route is implemented by a route folder under /app (e.g. app/about) and is driven by a colocated JSON config file.",
-      definition:
-        'In this repo, "route" always refers to the user-facing browser URL pathname, not an arbitrary file path.',
-      examples: {
-        urlRoutes: ["/", "/about", "/pricing"],
-        appRouterFolders: ["app/page.tsx", "app/about/page.tsx", "app/pricing/page.tsx"],
-      },
-      filesPerRoute: ["page.tsx", "pageConfig.json"],
-      sourceOfTruth:
-        "pageConfig.json (edit this; page.tsx is a fixed renderer)",
-      configShape: {
-        file: "pageConfig.json",
-        root: { elements: "BuilderElement[]" },
-        note: "The page renders config.elements (array of BuilderElement).",
-      },
-      locationNote:
-        "These files live inside the route folder (App Router convention). Example: for /about -> app/about/page.tsx and app/about/pageConfig.json.",
-    },
-    pageRenderer: {
-      fileName: "page.tsx",
-      behavior: [
-        "Imports pageConfig from ./pageConfig.json",
-        "Casts config to { elements: BuilderElement[] }",
-        "Renders: config.elements.map(el => <RenderElement key={el.id} el={el} />)",
-      ],
-      canonicalSource: `import { RenderElement } from "@/lib/renderer/RenderElement";
-import pageConfig from "./pageConfig.json";
-import type { BuilderElement } from "@/types/elements";
+    approach: "config-driven",
 
-export default function Page() {
-  const config = pageConfig as { elements: BuilderElement[] };
-  return config.elements.map((el) => <RenderElement key={el.id} el={el} />);
-}`,
+    routes: {
+      meaning: "URL pathname, not file path",
+      examples: ["/", "/about", "/pricing"],
+
+      structure: {
+        "/": "app/page.tsx + app/pageConfig.json",
+        "/about": "app/about/page.tsx + app/about/pageConfig.json",
+      },
+
+      files: ["page.tsx", "pageConfig.json"],
+
+      sourceOfTruth: "pageConfig.json",
+
+      config: {
+        root: "elements: BuilderElement[]",
+      },
     },
+
+    renderer: {
+      file: "page.tsx",
+
+      behavior: [
+        "imports ./pageConfig.json",
+        "casts to { elements: BuilderElement[] }",
+        "renders config.elements with RenderElement",
+      ],
+
+      fixed: true,
+    },
+
     elements: {
-      typeName: "BuilderElement",
-      supportedTypes: [
+      type: "BuilderElement",
+
+      supported: [
         "fragment",
         "div",
         "text",
@@ -73,26 +69,28 @@ export default function Page() {
         "link",
         "icon",
       ],
-      rendering: {
-        notes: [
-          "Unknown element types are warned and rendered as an error box.",
-          "Elements support Tailwind-only styling via className.",
-          "Elements may have children: BuilderElement[].",
-        ],
-      },
-    },
-    generatorGuidance: {
-      do: [
-        "Treat a route as a URL path (e.g. /about). Its code lives in the corresponding Next.js App Router folder (e.g. app/about).",
-        "UI changes can happen only by editing that route folder's pageConfig.json elements tree.",
-        "@/lib/renderer/RenderElement , @/types/elements already exist. No need to create them.",
-        "When creating a new URL route (e.g. /pricing), create the App Router folder (e.g. app/pricing) with page.tsx (fixed renderer) + pageConfig.json (initial elements). After that, codegen should only modify pageConfig.json.",
-        "Use Tailwind in className; prefer composition via nested children.",
+
+      rules: [
+        "Tailwind via className only",
+        "supports children: BuilderElement[]",
+        "unknown types render error UI",
       ],
+    },
+
+    guidance: {
+      do: [
+        "route = URL path",
+        "edit only pageConfig.json for UI changes",
+        "keep '/' populated",
+        "RenderElement and BuilderElement already exist",
+        "new routes require page.tsx + pageConfig.json",
+        "prefer nested composition",
+      ],
+
       dont: [
-        "Do not confuse URL routes with file paths; do not invent 'routes' that are just filenames.",
-        "Do not change page.tsx structure for URL routes (it is a fixed renderer).",
-        "Do not generate React components for layout; encode structure in JSON elements.",
+        "don't treat routes as file paths",
+        "don't generate React layout components",
+        "You are not allowed to modify anything other than pageConfig.json. Edits to page.tsx, layout.tsx, global.css, tailwind.config.ts are strictly prohibited. You can however create new routes with new pageConfig.json files but they will have fixed page.tsx.",
       ],
     },
   },

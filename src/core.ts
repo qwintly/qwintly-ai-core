@@ -15,6 +15,9 @@ import { statusService } from "./logging/genStatus.service.js";
 import { SendStatusToRedis } from "./logging/redis.service.js";
 import { ContextRepository } from "./repository/context.repository.js";
 import { GenStatusRepository } from "./repository/genStatus.repository.js";
+import { ProjectOpsRepository } from "./repository/projectOperations.repository.js";
+import { applyOperations } from "./services/syncEditOps.service.js";
+import { initializeToolCallsRepository } from "./services/toolcallPersist.service.js";
 import { EventType, GenStep } from "./types/events.js";
 import {
   CodegenIndex,
@@ -23,7 +26,6 @@ import {
 } from "./types/index/index.types.js";
 import type { ProjectInfo } from "./types/projectInfo.types.js";
 import { assertNonEmptyString } from "./utils/utils.js";
-import { initializeToolCallsRepository } from "./services/toolcallPersist.service.js";
 
 export type QwintlyCoreOptions = {
   chatId: string;
@@ -63,6 +65,7 @@ export class QwintlyCore {
   private readonly statusRepo: GenStatusRepository;
   private readonly ctxRepo: ContextRepository;
   private readonly redisStatusPublisher: SendStatusToRedis;
+  private readonly projectOpsRepo: ProjectOpsRepository;
 
   constructor(options: QwintlyCoreOptions) {
     assertNonEmptyString(options.chatId, "chatId");
@@ -101,6 +104,10 @@ export class QwintlyCore {
       options.supabase.secret,
     );
     this.ctxRepo = new ContextRepository(
+      options.supabase.endpoint,
+      options.supabase.secret,
+    );
+    this.projectOpsRepo = new ProjectOpsRepository(
       options.supabase.endpoint,
       options.supabase.secret,
     );
@@ -204,5 +211,18 @@ export class QwintlyCore {
 
   public async buildValidatorIdx(): Promise<ValidatorIndex> {
     return this.buildIndex(buildValidatorIndex);
+  }
+
+  public async syncEditOps(genId: string, workspace: string): Promise<boolean> {
+    if (!genId) return false;
+    const projectOpsRepo = this.projectOpsRepo;
+    const ops = await projectOpsRepo.fetchProjectOperations(genId);
+    if (!ops || ops.length === 0) return false;
+    const appliedIds = await applyOperations(ops, workspace);
+    if (appliedIds.length > 0) {
+      await projectOpsRepo.markOperationsApplied(appliedIds);
+    }
+    const isModified = appliedIds.length > 0;
+    return isModified;
   }
 }

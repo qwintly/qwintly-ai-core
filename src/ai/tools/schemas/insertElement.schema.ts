@@ -103,29 +103,28 @@ const buildBuilderElementSchema = (depth: number): any => {
         type: Type.STRING,
         enum: ELEMENT_TYPES,
         description:
-          "Element type to render. 'text' renders a <p>, 'image' renders an <img>, 'link' renders an <a>, 'icon' renders a Lucide icon, 'fragment' renders children only.",
+          "Element type to render. Use 'text' for <p>, 'image' forn <img>, 'link' for <a>, 'icon' for Lucide icon, 'fragment' renders children only",
       },
       className: {
         type: Type.STRING,
-        description:
-          "Tailwind CSS className applied to the rendered element (Tailwind only).",
+        description: "Tailwind CSS className (Tailwind only)",
       },
       visible: {
         type: Type.BOOLEAN,
-        description: "Whether the element should be shown.",
+        description: "Visibility flag",
       },
       props: BuilderElementPropsSchema,
       children: {
         type: Type.ARRAY,
         description:
-          "Nested children. Each child is another element and can itself have children (children[].children[]...).",
+          "Child elements. Each child can itself have children (children[].children[]...)",
         items:
           depth > 0
             ? buildBuilderElementSchema(depth - 1)
             : {
                 type: Type.OBJECT,
                 description:
-                  "Max depth reached in tool schema. If you need deeper nesting, insert the parent first, then insert children using the returned inserted_id as parent_id.",
+                  "Max depth reached. Insert deeper children separately using the returned inserted_id as parent_id",
               },
       },
     },
@@ -133,7 +132,7 @@ const buildBuilderElementSchema = (depth: number): any => {
   };
 };
 
-export const BuilderElementSchema: any = buildBuilderElementSchema(6);
+export const BuilderElementSchema: any = buildBuilderElementSchema(4);
 
 export const InsertElementSchema = {
   name: "insert_element",
@@ -144,8 +143,9 @@ export const InsertElementSchema = {
     properties: {
       route: {
         type: Type.STRING,
+        pattern: "^/(?:[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)?$",
         description:
-          "The route to insert the element at. Example. '/' or '/about' etc.",
+          "The route to insert the element at. Use URL paths with forward slashes only. Examples: '/', '/about', '/pricing'. Never send Windows-style backslashes (e.g. '\\\\') or filesystem paths like 'app/pricing'. Never send empty string.",
       },
       parent_id: {
         type: Type.STRING,

@@ -19,6 +19,17 @@ export const createReadFileImpl = (deps: WorkspaceDeps) => {
     }
 
     const content = await fs.readFile(fullPath);
+
+    const isJson = filePath.trim().toLowerCase().endsWith(".json");
+    const isRanged = startLine !== undefined || endLine !== undefined;
+    if (isJson && !isRanged) {
+      try {
+        return { kind: "json", json: JSON.parse(content) as unknown };
+      } catch {
+        // If JSON parsing fails (or file isn't actually JSON), fall back to text slicing.
+      }
+    }
+
     return sliceByLines(content, startLine, endLine);
   };
 };

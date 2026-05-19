@@ -79,7 +79,8 @@ export const createInsertElementImpl = (deps: WorkspaceDeps) => {
     if (!parent) return { success: false, error: "parent not found" };
 
     const anyParent = parent as any;
-    if (!Array.isArray(anyParent.children)) anyParent.children = [];
+    if (!anyParent.children || !Array.isArray(anyParent.children))
+      anyParent.children = [];
     (anyParent.children as BuilderElement[]).push(toInsert);
 
     const after = stringifyPageConfigJson({ elements });

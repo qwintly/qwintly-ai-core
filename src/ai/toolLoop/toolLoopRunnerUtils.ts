@@ -221,6 +221,21 @@ export const recordToolEvent = (params: {
       return;
     }
 
+    const successVal = (toolResult as any)?.success;
+    if (typeof successVal === "boolean") {
+      const changedVal = (toolResult as any)?.changed;
+      const changedText = typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
+      const errText =
+        successVal === false
+          ? ` error=${JSON.stringify((toolResult as any)?.error ?? "unknown")}`
+          : "";
+      toolEvents.push({
+        name,
+        summary: `${name} ${successVal ? "success" : "failure"}${changedText}${errText}`,
+      });
+      return;
+    }
+
     toolEvents.push({ name, summary: `${name} called` });
   } catch {
     toolEvents.push({ name, summary: `${name} called` });
