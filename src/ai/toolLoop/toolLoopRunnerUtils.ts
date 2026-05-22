@@ -32,34 +32,30 @@ export const serializeError = (err: unknown) => {
 };
 
 export const isTransientAiCallError = (err: unknown) => {
-  const anyErr = err as any;
+  let cur: any = err as any;
+  for (let depth = 0; depth < 4 && cur; depth++) {
+    const code =
+      cur?.error?.code ?? cur?.code ?? cur?.statusCode ?? cur?.response?.status;
 
-  const code =
-    anyErr?.error?.code ??
-    anyErr?.code ??
-    anyErr?.statusCode ??
-    anyErr?.response?.status;
+    const status =
+      cur?.error?.status ?? cur?.status ?? cur?.response?.data?.error?.status;
 
-  const status =
-    anyErr?.error?.status ??
-    anyErr?.status ??
-    anyErr?.response?.data?.error?.status;
+    const message =
+      cur?.error?.message ?? cur?.message ?? cur?.response?.data?.error?.message;
 
-  const message =
-    anyErr?.error?.message ??
-    anyErr?.message ??
-    anyErr?.response?.data?.error?.message;
+    const msg = typeof message === "string" ? message.toLowerCase() : "";
+    const stat = typeof status === "string" ? status.toUpperCase() : "";
 
-  const msg = typeof message === "string" ? message.toLowerCase() : "";
-  const stat = typeof status === "string" ? status.toUpperCase() : "";
+    if (code === 503) return true;
+    if (code === 429) return true;
+    if (stat === "UNAVAILABLE") return true;
+    if (stat === "RESOURCE_EXHAUSTED") return true;
+    if (msg.includes("high demand")) return true;
+    if (msg.includes("try again later")) return true;
+    if (msg.includes("temporar")) return true;
 
-  if (code === 503) return true;
-  if (code === 429) return true;
-  if (stat === "UNAVAILABLE") return true;
-  if (stat === "RESOURCE_EXHAUSTED") return true;
-  if (msg.includes("high demand")) return true;
-  if (msg.includes("try again later")) return true;
-  if (msg.includes("temporar")) return true;
+    cur = cur?.cause;
+  }
 
   return false;
 };
@@ -148,6 +144,22 @@ export const recordToolEvent = (params: {
   toolResult: unknown;
   toolResultRaw: unknown;
 }) => {
+  const oneLine = (value: unknown, maxLen = 140) => {
+    const raw =
+      typeof value === "string"
+        ? value
+        : value === undefined
+          ? ""
+          : value === null
+            ? "null"
+            : JSON.stringify(value);
+    const collapsed = raw.replace(/\s+/g, " ").trim();
+    if (collapsed.length <= maxLen) return collapsed;
+    return `${collapsed.slice(0, Math.max(0, maxLen - 1))}…`;
+  };
+
+  const getStringArg = (key: string) => oneLine(params.effectiveArgs[key] ?? "");
+
   const {
     toolEvents,
     name,
@@ -190,6 +202,144 @@ export const recordToolEvent = (params: {
       return;
     }
 
+    if (name === "create_new_route") {
+      const parentRoute = getStringArg("parent_route") || "/";
+      const routeName = getStringArg("route_name");
+      const successVal = (toolResult as any)?.success;
+      if (typeof successVal === "boolean") {
+        const route = oneLine((toolResult as any)?.route ?? "");
+        const createdFiles = Array.isArray((toolResult as any)?.created_files)
+          ? ((toolResult as any).created_files as unknown[])
+          : [];
+        const filesText =
+          successVal === true
+            ? ` created_files=${createdFiles.length}`
+            : "";
+        const routeText = route ? ` route=${route}` : "";
+        const errText =
+          successVal === false
+            ? ` error=${oneLine((toolResult as any)?.error ?? "unknown", 160)}`
+            : "";
+        toolEvents.push({
+          name,
+          summary: `create_new_route ${successVal ? "success" : "failure"} parent_route=${parentRoute} route_name=${routeName}${routeText}${filesText}${errText}`,
+        });
+        return;
+      }
+    }
+
+    if (name === "insert_element") {
+      const route = getStringArg("route");
+      const parentId = getStringArg("parent_id");
+      const beforeId = getStringArg("before_id");
+      const successVal = (toolResult as any)?.success;
+      if (typeof successVal === "boolean") {
+        const insertedId = oneLine((toolResult as any)?.inserted_id ?? "");
+        const changedVal = (toolResult as any)?.changed;
+        const changedText =
+          typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
+        const beforeText = beforeId ? ` before_id=${beforeId}` : "";
+        const insertedText = insertedId ? ` inserted_id=${insertedId}` : "";
+        const errText =
+          successVal === false
+            ? ` error=${oneLine((toolResult as any)?.error ?? "unknown", 160)}`
+            : "";
+        toolEvents.push({
+          name,
+          summary: `insert_element ${successVal ? "success" : "failure"} route=${route} parent_id=${parentId}${beforeText}${insertedText}${changedText}${errText}`,
+        });
+        return;
+      }
+    }
+
+    if (name === "update_classname") {
+      const route = getStringArg("route");
+      const elementId = getStringArg("element_id");
+      const className = oneLine(effectiveArgs.className ?? "", 160);
+      const successVal = (toolResult as any)?.success;
+      if (typeof successVal === "boolean") {
+        const changedVal = (toolResult as any)?.changed;
+        const changedText =
+          typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
+        const updatedId = oneLine((toolResult as any)?.updated_id ?? "");
+        const updatedText = updatedId ? ` updated_id=${updatedId}` : "";
+        const errText =
+          successVal === false
+            ? ` error=${oneLine((toolResult as any)?.error ?? "unknown", 160)}`
+            : "";
+        toolEvents.push({
+          name,
+          summary: `update_classname ${successVal ? "success" : "failure"} route=${route} element_id=${elementId} className="${className}"${updatedText}${changedText}${errText}`,
+        });
+        return;
+      }
+    }
+
+    if (name === "update_props") {
+      const route = getStringArg("route");
+      const elementId = getStringArg("element_id");
+      const successVal = (toolResult as any)?.success;
+      if (typeof successVal === "boolean") {
+        const changedVal = (toolResult as any)?.changed;
+        const changedText =
+          typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
+        const updatedId = oneLine((toolResult as any)?.updated_id ?? "");
+        const updatedText = updatedId ? ` updated_id=${updatedId}` : "";
+        const patchKeys = Object.keys(effectiveArgs ?? {}).filter((k) => {
+          if (k === "route" || k === "element_id") return false;
+          const v = (effectiveArgs as any)[k];
+          return v !== undefined && v !== null;
+        });
+        const keysText =
+          patchKeys.length > 0
+            ? ` keys=${oneLine(patchKeys.sort().join(","), 140)}`
+            : "";
+        const errText =
+          successVal === false
+            ? ` error=${oneLine((toolResult as any)?.error ?? "unknown", 160)}`
+            : "";
+        toolEvents.push({
+          name,
+          summary: `update_props ${successVal ? "success" : "failure"} route=${route} element_id=${elementId}${keysText}${updatedText}${changedText}${errText}`,
+        });
+        return;
+      }
+    }
+
+    if (name === "update_global_styles") {
+      const tokens = (effectiveArgs as any)?.tokens;
+      const tokenKeys = tokens && typeof tokens === "object" && !Array.isArray(tokens)
+        ? Object.keys(tokens as Record<string, unknown>)
+        : [];
+      const successVal = (toolResult as any)?.success;
+      if (typeof successVal === "boolean") {
+        const changedVal = (toolResult as any)?.changed;
+        const changedText =
+          typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
+        const version = (toolResult as any)?.version;
+        const versionText =
+          typeof version === "number" && Number.isFinite(version)
+            ? ` version=${version}`
+            : "";
+        const created = (toolResult as any)?.created;
+        const createdText =
+          typeof created === "boolean" ? ` created=${created}` : "";
+        const keysText =
+          tokenKeys.length > 0
+            ? ` tokens=${oneLine(tokenKeys.sort().join(","), 160)}`
+            : "";
+        const errText =
+          successVal === false
+            ? ` error=${oneLine((toolResult as any)?.error ?? "unknown", 160)}`
+            : "";
+        toolEvents.push({
+          name,
+          summary: `update_global_styles ${successVal ? "success" : "failure"}${keysText}${versionText}${createdText}${changedText}${errText}`,
+        });
+        return;
+      }
+    }
+
     if (name === "search") {
       const q = String(effectiveArgs.search_query ?? "").trim();
       const results = Array.isArray((toolResultRaw as any)?.results)
@@ -227,7 +377,7 @@ export const recordToolEvent = (params: {
       const changedText = typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
       const errText =
         successVal === false
-          ? ` error=${JSON.stringify((toolResult as any)?.error ?? "unknown")}`
+          ? ` error=${oneLine((toolResult as any)?.error ?? "unknown", 160)}`
           : "";
       toolEvents.push({
         name,

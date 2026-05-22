@@ -6,6 +6,7 @@ import { createListDirImpl } from "./listDir.impl.js";
 import { createReadFileImpl } from "./readFile.impl.js";
 import { createSearchImpl, type SearchDeps } from "./search.impl.js";
 import { createUpdateClassNameImpl } from "./updateClassName.impl.js";
+import { createUpdateGlobalStylesImpl } from "./updateGlobalStyles.impl.js";
 import { createUpdatePropsImpl } from "./updateProps.impl.js";
 import { createWriteFileImpl } from "./writeFile.impl.js";
 
@@ -28,6 +29,7 @@ export {
   type SearchResult,
 } from "./search.impl.js";
 export { createUpdateClassNameImpl } from "./updateClassName.impl.js";
+export { createUpdateGlobalStylesImpl } from "./updateGlobalStyles.impl.js";
 export { createUpdatePropsImpl } from "./updateProps.impl.js";
 export { createWriteFileImpl } from "./writeFile.impl.js";
 
@@ -37,6 +39,7 @@ export const createWorkspaceToolImpls = (deps: SearchDeps) => {
   const listDirImpl = createListDirImpl(deps);
   const searchImpl = createSearchImpl(deps);
   const applyPatchImpl = createApplyPatchImpl(deps);
+  const updateGlobalStylesImpl = createUpdateGlobalStylesImpl(deps);
   const createNewRouteImpl = createCreateNewRouteImpl(deps);
   const deleteElementImpl = createDeleteElementImpl(deps);
   const insertElementImpl = createInsertElementImpl(deps);
@@ -49,6 +52,7 @@ export const createWorkspaceToolImpls = (deps: SearchDeps) => {
     listDirImpl,
     searchImpl,
     applyPatchImpl,
+    updateGlobalStylesImpl,
     createNewRouteImpl,
     deleteElementImpl,
     insertElementImpl,

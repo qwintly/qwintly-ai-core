@@ -56,9 +56,11 @@ export class GenerateGeminiReponse {
         ...(Object.keys(config).length > 0 && { config }),
       });
     } catch (err: any) {
-      throw new Error(
+      const wrapped = new Error(
         `AI generation failed: ${err?.message || "Unknown error"}`,
       );
+      (wrapped as any).cause = err;
+      throw wrapped;
     }
   }
 }

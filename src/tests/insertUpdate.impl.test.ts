@@ -67,6 +67,20 @@ test("insert/update tools: inject ids, insert under parent, update props and cla
     const insertedId = (inserted as any).inserted_id as string;
     assert.ok(typeof insertedId === "string" && insertedId.startsWith("el_"));
 
+    const inserted2 = await insert({
+      route: "/a",
+      parent_id: "root",
+      before_id: "existing",
+      element: { type: "text", props: { text: "first" } },
+    } as any);
+    assert.equal(
+      (inserted2 as any).success,
+      true,
+      `unexpected response: ${JSON.stringify(inserted2)}`,
+    );
+    const inserted2Id = (inserted2 as any).inserted_id as string;
+    assert.ok(typeof inserted2Id === "string" && inserted2Id.startsWith("el_"));
+
     const up1 = await updateProps({
       route: "/a",
       element_id: insertedId,
@@ -79,7 +93,11 @@ test("insert/update tools: inject ids, insert under parent, update props and cla
     assert.equal((up2 as any).success, true);
 
     const after = JSON.parse(await fs.readFile(filePath, "utf-8"));
-    const found = (after.elements[0].children as any[]).find((e) => e.id === insertedId);
+    const children = after.elements[0].children as any[];
+    assert.equal(children[0].id, inserted2Id);
+    assert.equal(children[1].id, "existing");
+
+    const found = children.find((e) => e.id === insertedId);
     assert.ok(found);
     assert.equal(found.props.text, "updated");
     assert.equal(found.props.href, "/x");

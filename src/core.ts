@@ -132,6 +132,7 @@ export class QwintlyCore {
     handlers: Record<string, ToolHandler>,
     maxSteps: number,
     terminalToolNames: string[],
+    persistResponse?: (modelInput: any, modelOutput: any) => Promise<void>,
   ): Promise<ToolLoopResult> {
     if (!this.aiClient) {
       throw new Error(
@@ -150,6 +151,7 @@ export class QwintlyCore {
           toolCallingMode: options.toolCallingMode,
         }),
       logger: this.streamLog.bind(this),
+      persistResponse,
     };
 
     const result = await runToolLoop(toolLoopOptions);

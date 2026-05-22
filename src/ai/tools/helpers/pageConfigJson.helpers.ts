@@ -166,9 +166,19 @@ export const writeFileAtomic = async (filePath: string, content: string) => {
     await fs.writeFile(tmp, content ?? "", "utf-8");
 
     // Windows rename doesn't overwrite; do a 2-step swap.
-    await fs.rename(filePath, bak);
-    await fs.rename(tmp, filePath);
-    await fs.rm(bak, { force: true });
+    try {
+      await fs.rename(filePath, bak);
+      await fs.rename(tmp, filePath);
+      await fs.rm(bak, { force: true });
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException | null)?.code;
+      if (code === "ENOENT") {
+        // No previous file; just put the temp file in place.
+        await fs.rename(tmp, filePath);
+      } else {
+        throw err;
+      }
+    }
   } catch (err) {
     // rollback best-effort
     try {

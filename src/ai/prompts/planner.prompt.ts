@@ -44,6 +44,11 @@ export const plannerPrompt = (params: PlanNodePromptParams) => {
       - search: search codebase
       - list_dir: list dirs
       - submit_planner_tasks: Finalize planner output
+
+      Styling guidance:
+      - Codegen can call update_global_styles to modify app/styleConfig.json (global design tokens).
+      - Prefer semantic Tailwind token classes (bg-background, text-foreground, border-border, ring-ring, etc.) so global styles are utilized.
+      - If a task requires changing theme tokens, specify exact update_global_styles args: {"tokens": {"<tokenKey>":"<cssString>"}} (never {"tokens":{}}).
     `,
   );
 

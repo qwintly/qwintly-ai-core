@@ -7,12 +7,14 @@ import { DeleteElementSchema } from "../schemas/deleteElement.schema.js";
 import { InsertElementSchema } from "../schemas/insertElement.schema.js";
 import { UpdateClassNameSchema } from "../schemas/updateClassName.schema.js";
 import { UpdatePropsSchema } from "../schemas/updateProps.schema.js";
+import { UpdateGlobalStylesSchema } from "../schemas/updateGlobalStyles.schema.js";
 
 export const codegenTools = (): Tool[] => {
   return [
     {
       functionDeclarations: [
         ReadFileSchema,
+        UpdateGlobalStylesSchema,
         CreateNewRouteSchema,
         InsertElementSchema,
         DeleteElementSchema,

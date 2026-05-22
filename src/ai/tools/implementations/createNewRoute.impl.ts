@@ -34,7 +34,7 @@ const DEFAULT_PAGE_CONFIG = (() => {
     {
       id: "root",
       type: "div",
-      className: "min-h-screen p-6",
+      className: "min-h-screen p-6 bg-background text-foreground",
       props: {},
     },
   ];

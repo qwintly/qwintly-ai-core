@@ -61,11 +61,15 @@ export type RunToolLoopOptions = {
   aiCallAutoRetryMax?: number;
   aiCallAutoRetryBaseMs?: number;
   aiCallAutoRetryMaxMs?: number;
+  persistResponse?: (modelInput: any, modelOutput: any) => Promise<void>;
 };
 
 export async function runToolLoop(
   options: RunToolLoopOptions,
 ): Promise<ToolLoopResult> {
+  const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+
   const {
     initialContents,
     tools,
@@ -81,6 +85,7 @@ export async function runToolLoop(
     aiCallAutoRetryMax = 3, // must have it to try 3 times as gemini errors a lot due to high demand sometimes
     aiCallAutoRetryBaseMs = 400,
     aiCallAutoRetryMaxMs = 10_000,
+    persistResponse,
   } = options;
 
   if (typeof aiCall !== "function") {
@@ -95,8 +100,25 @@ export async function runToolLoop(
   const toolEvents: ToolEvent[] = [];
   let applyPatchRetryCount = 0;
 
-  const fullTraceContents: any[] = keepFullTrace ? [...initialContents] : [];
-  let modelContents: any[] = [...initialContents];
+  const EXECUTION_GUIDE_MARKER = "TOOL_LOOP_EXECUTION_GUIDE_V1";
+  const executionGuideInstruction = {
+    role: "user",
+    parts: [
+      {
+        text:
+          `${EXECUTION_GUIDE_MARKER}\n` +
+          `Execution limit: At most ${maxSteps} assistant turn(s) in this tool loop. ` +
+          `One turn = one assistant response in the tool loop.\n` +
+          `Complete the task in as few turns as possible and avoid unnecessary actions. Prioritize correctness.`,
+      },
+    ],
+  };
+
+  const fullTraceContents: any[] = keepFullTrace
+    ? [...initialContents, executionGuideInstruction]
+    : [];
+  let modelContents: any[] = [...initialContents, executionGuideInstruction];
+  const pinnedInitialCount = initialContents.length + 1;
   const pushBoth = (fullItem: any, modelItem: any) => {
     if (keepFullTrace) fullTraceContents.push(fullItem);
     modelContents.push(modelItem);
@@ -106,28 +128,8 @@ export async function runToolLoop(
   };
 
   for (let step = 0; step < maxSteps; step++) {
-    const remaining = maxSteps - step;
-
-    const budgetInstruction = {
-      role: "user",
-      parts: [
-        {
-          text:
-            `Execution limit: ${remaining} turn(s) remaining including this one. ` +
-            `One turn = one assistant response in the tool loop. ` +
-            `Complete the task in as few turns as possible and avoid unnecessary actions. Prioritize correctness` +
-            `${remaining <= 5 ? `Approaching execution limit. Only ${remaining} turns left` : ""}`,
-        },
-      ],
-    };
-
-    if (keepFullTrace) {
-      fullTraceContents.push(budgetInstruction);
-    }
-    modelContents.push(budgetInstruction);
-
     modelContents = compactForModel({
-      initialCount: initialContents.length,
+      initialCount: pinnedInitialCount,
       modelContents,
       toolEvents,
       policy,
@@ -142,16 +144,53 @@ export async function runToolLoop(
     }
 
     let response: Awaited<ReturnType<AiCallFn>>;
-    response = await aiCallWithRetry({
-      aiCall,
-      request: modelContents,
-      options: { tools, toolCallingMode },
-      retryMax: aiCallAutoRetryMax,
-      retryBaseMs: aiCallAutoRetryBaseMs,
-      retryMaxMs: aiCallAutoRetryMaxMs,
-      step: step + 1,
-      logger,
-    });
+    try {
+      response = await aiCallWithRetry({
+        aiCall,
+        request: modelContents,
+        options: { tools, toolCallingMode },
+        retryMax: aiCallAutoRetryMax,
+        retryBaseMs: aiCallAutoRetryBaseMs,
+        retryMaxMs: aiCallAutoRetryMaxMs,
+        step: step + 1,
+        logger,
+      });
+    } catch (err) {
+      logger(
+        "Tool loop: AI provider error; preserving context and continuing",
+        EVENT_TYPES.STEP_ERROR,
+      );
+      console.error("Tool loop: aiCall failed (provider/server side)", err, {
+        step: step + 1,
+        error: serializeError(err),
+      });
+
+      const message =
+        err instanceof Error ? err.message : JSON.stringify(err ?? null);
+      const providerErrorInstruction = {
+        role: "user",
+        parts: [
+          {
+            text:
+              `AI provider error (server-side). Do NOT clear or restart context; continue from the existing conversation state.\n` +
+              `Error: ${message}\n` +
+              `Next: retry the last request using the same context. If you were about to call tools, resend a valid tool call.`,
+          },
+        ],
+      };
+      if (keepFullTrace) fullTraceContents.push(providerErrorInstruction);
+      continue;
+    }
+
+    if (persistResponse) {
+      try {
+        await persistResponse(modelContents, response);
+      } catch (err) {
+        console.error("Tool loop: failed to persist response", err, {
+          step: step + 1,
+        });
+      }
+    }
 
     const functionCalls = response.functionCalls ?? [];
     if (functionCalls.length === 0) {
@@ -163,12 +202,62 @@ export async function runToolLoop(
       };
     }
 
-    for (const call of functionCalls) {
+    const signatureById = (() => {
+      try {
+        const candidates = Array.isArray((response as any)?.candidates)
+          ? ((response as any).candidates as any[])
+          : [];
+        const parts = candidates?.[0]?.content?.parts;
+        const arr = Array.isArray(parts) ? (parts as any[]) : [];
+        const map = new Map<string, string>();
+        for (const p of arr) {
+          const fc = p?.functionCall;
+          const id = fc?.id;
+          const sig = p?.thoughtSignature ?? p?.thought_signature;
+          if (typeof id === "string" && typeof sig === "string" && sig) {
+            map.set(id, sig);
+          }
+        }
+        return map;
+      } catch {
+        return new Map<string, string>();
+      }
+    })();
+
+    for (let callIndex = 0; callIndex < functionCalls.length; callIndex++) {
+      const call = functionCalls[callIndex];
       const name = call.name?.toString() ?? "";
       const args = (call.args ?? {}) as Record<string, unknown>;
+      const thoughtSignature: string | undefined = (() => {
+        const direct =
+          (call as any)?.thought_signature ?? (call as any)?.thoughtSignature;
+        if (typeof direct === "string" && direct) return direct;
+        const id = (call as any)?.id;
+        if (typeof id === "string" && signatureById.has(id)) {
+          return signatureById.get(id);
+        }
+        return undefined;
+      })();
 
       if (!name) {
-        throw new Error("Tool loop: function call missing name.");
+        logger(
+          "Tool loop: malformed function call from model; preserving context and continuing",
+          EVENT_TYPES.STEP_ERROR,
+        );
+        const malformedInstruction = {
+          role: "user",
+          parts: [
+            {
+              text:
+                `Malformed function call received (missing tool name). Do NOT clear or restart context.\n` +
+                `Resend a single valid tool call with a non-empty name and JSON args.\n` +
+                `Bad call: ${JSON.stringify(call ?? null).slice(0, 1500)}`,
+            },
+          ],
+        };
+        if (keepFullTrace) fullTraceContents.push(malformedInstruction);
+        modelContents.push(malformedInstruction);
+        continue;
       }
 
       const handler = handlers[name];
@@ -209,14 +298,31 @@ export async function runToolLoop(
 
       const modelArgs = redactFunctionCallArgs(name, effectiveArgs);
 
+      const functionCallPart = {
+        functionCall: {
+          name,
+          args: effectiveArgs,
+        },
+        ...(thoughtSignature
+          ? { thoughtSignature: thoughtSignature, thought_signature: thoughtSignature }
+          : {}),
+      };
+
+      const functionCallPartModel = {
+        functionCall: {
+          name,
+          args: modelArgs,
+        },
+        ...(thoughtSignature
+          ? { thoughtSignature: thoughtSignature, thought_signature: thoughtSignature }
+          : {}),
+      };
+
       const assistantFull = {
         role: "model",
         parts: [
           {
-            functionCall: {
-              name,
-              args: effectiveArgs,
-            },
+            ...functionCallPart,
           },
         ],
       };
@@ -225,10 +331,7 @@ export async function runToolLoop(
         role: "model",
         parts: [
           {
-            functionCall: {
-              name,
-              args: modelArgs,
-            },
+            ...functionCallPartModel,
           },
         ],
       };
@@ -244,7 +347,25 @@ export async function runToolLoop(
         toolResultRaw = handlerMissingResult;
       } else {
         try {
-          toolResultRaw = await handler(effectiveArgs);
+          if (name === "update_global_styles") {
+            const tokens = (effectiveArgs as any)?.tokens;
+            if (isPlainObject(tokens) && Object.keys(tokens).length === 0) {
+              toolResultRaw = {
+                success: false,
+                error: "tokens patch must not be empty",
+                error_detail: {
+                  name: "InvalidToolArgumentsError",
+                  message:
+                    "update_global_styles requires at least one token key/value (e.g. { tokens: { radius: \"0.75rem\" } }).",
+                },
+                note: "Resend update_global_styles with at least one token key/value, or skip this tool call.",
+              };
+            } else {
+              toolResultRaw = await handler(effectiveArgs);
+            }
+          } else {
+            toolResultRaw = await handler(effectiveArgs);
+          }
         } catch (err) {
           logger(`AI tool: ${name} failed`, EVENT_TYPES.STEP_ERROR);
           console.error("Tool loop: handler threw", err, {

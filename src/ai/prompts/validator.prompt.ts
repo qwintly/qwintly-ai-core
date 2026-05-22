@@ -62,6 +62,11 @@ export const validatorPrompt = (params: ValidationNodePromptParams) => {
       - search: search codebase
       - list_dir: list dirs
       - submit_planner_tasks: submit tasks
+
+      Styling guidance:
+      - Codegen can call update_global_styles to modify app/styleConfig.json (global design tokens).
+      - Prefer semantic Tailwind token classes (bg-background, text-foreground, border-border, ring-ring, etc.) so global styles are utilized.
+      - If a fix requires changing theme tokens, specify exact update_global_styles args: {"tokens": {"<tokenKey>":"<cssString>"}} (never {"tokens":{}}).
     `.trim(),
   );
 

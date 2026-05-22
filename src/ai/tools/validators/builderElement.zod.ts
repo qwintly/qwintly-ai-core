@@ -12,8 +12,18 @@ export const ELEMENT_TYPES = [
   "icon",
 ] as const;
 
+const normalizeInternalRoutePath = (value: unknown) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const forwardOnly = raw.replace(/\\/g, "/");
+  if (forwardOnly === "/") return "/";
+  if (forwardOnly.startsWith("/")) return forwardOnly;
+  // Fallback: if caller forgot the leading slash, assume they meant an app route.
+  return `/${forwardOnly}`;
+};
+
 const isInternalRoutePath = (value: string) => {
-  const s = String(value ?? "").trim();
+  const s = normalizeInternalRoutePath(value);
   if (!s) return false;
   if (s.includes("\\")) return false;
   // Allow "/" or "/a" or "/a/b-c_d"
@@ -23,13 +33,16 @@ const isInternalRoutePath = (value: string) => {
 export const OnClickActionZod = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("route"),
-    href: z
-      .string()
-      .min(1)
-      .refine(isInternalRoutePath, {
-        message:
-          "href must be an internal route path like '/' or '/pricing' (forward slashes only; no backslashes)",
-      }),
+    href: z.preprocess(
+      normalizeInternalRoutePath,
+      z
+        .string()
+        .min(1)
+        .refine(isInternalRoutePath, {
+          message:
+            "href must be an internal route path like '/' or '/pricing' (forward slashes only; no backslashes)",
+        }),
+    ),
     replace: z.boolean().optional(),
   }),
   z.object({ kind: z.literal("back") }),
@@ -67,13 +80,17 @@ export const BuilderElementZod: z.ZodType<any> = z.object({
 });
 
 export const InsertElementArgsZod = z.object({
-  route: z
-    .string()
-    .min(1)
-    .refine(isInternalRoutePath, {
-      message:
-        "route must be like '/' or '/about' (forward slashes only; no backslashes)",
-    }),
+  route: z.preprocess(
+    normalizeInternalRoutePath,
+    z
+      .string()
+      .min(1)
+      .refine(isInternalRoutePath, {
+        message:
+          "route must be like '/' or '/about' (forward slashes only; no backslashes)",
+      }),
+  ),
   parent_id: z.string().min(1),
+  before_id: z.string().min(1).optional(),
   element: BuilderElementZod,
 });

@@ -1,6 +1,5 @@
 import { resolveUnsplashImagesDeep } from "../../../image/unsplash.service.js";
 import type { BuilderElement } from "../../../types/elements.js";
-import { InsertElementArgsZod } from "../validators/builderElement.zod.js";
 import {
   ensureElementIds,
   extractAllIdsDeep,
@@ -10,17 +9,29 @@ import {
   stringifyPageConfigJson,
   writeFileAtomic,
 } from "../helpers/pageConfigJson.helpers.js";
+import { InsertElementArgsZod } from "../validators/builderElement.zod.js";
 import { type WorkspaceDeps } from "./workspaceDeps.js";
 
 export const createInsertElementImpl = (deps: WorkspaceDeps) => {
   const { workspaceRoot, fs } = deps;
 
-  return async (route: string, parentId: string, element: BuilderElement) => {
-    const parsedArgs = InsertElementArgsZod.safeParse({
-      route,
-      parent_id: parentId,
-      element,
-    });
+  return async (
+    routeOrArgs: string | Record<string, unknown>,
+    parentId?: string,
+    element?: BuilderElement,
+    beforeId?: string,
+  ) => {
+    const rawArgs =
+      typeof routeOrArgs === "object" && routeOrArgs !== null
+        ? (routeOrArgs as Record<string, unknown>)
+        : {
+            route: routeOrArgs,
+            parent_id: parentId,
+            before_id: beforeId,
+            element,
+          };
+
+    const parsedArgs = InsertElementArgsZod.safeParse(rawArgs);
     if (!parsedArgs.success) {
       return {
         success: false,
@@ -29,12 +40,14 @@ export const createInsertElementImpl = (deps: WorkspaceDeps) => {
       };
     }
 
-    const parent_id = String(parentId ?? "").trim();
+    const parent_id = String(parsedArgs.data.parent_id ?? "").trim();
     if (!parent_id) return { success: false, error: "invalid parent_id" };
+
+    const before_id = String(parsedArgs.data.before_id ?? "").trim();
 
     let configPath: string;
     try {
-      configPath = getPageConfigJsonPath(workspaceRoot, route);
+      configPath = getPageConfigJsonPath(workspaceRoot, parsedArgs.data.route);
     } catch (err) {
       return {
         success: false,
@@ -70,7 +83,7 @@ export const createInsertElementImpl = (deps: WorkspaceDeps) => {
 
     // Clone + inject ids for the inserted element subtree.
     const toInsert = JSON.parse(
-      JSON.stringify(element ?? null),
+      JSON.stringify(parsedArgs.data.element ?? null),
     ) as BuilderElement;
     await resolveUnsplashImagesDeep(toInsert);
     ensureElementIds([toInsert], existingIds);
@@ -81,7 +94,18 @@ export const createInsertElementImpl = (deps: WorkspaceDeps) => {
     const anyParent = parent as any;
     if (!anyParent.children || !Array.isArray(anyParent.children))
       anyParent.children = [];
-    (anyParent.children as BuilderElement[]).push(toInsert);
+
+    const children = anyParent.children as BuilderElement[];
+    if (before_id) {
+      const idx = children.findIndex((c: any) => String(c?.id ?? "") === before_id);
+      if (idx >= 0) {
+        children.splice(idx, 0, toInsert);
+      } else {
+        children.push(toInsert);
+      }
+    } else {
+      children.push(toInsert);
+    }
 
     const after = stringifyPageConfigJson({ elements });
     try {
