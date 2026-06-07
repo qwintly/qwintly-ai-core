@@ -1,9 +1,6 @@
 import {
-  ensureElementIds,
-  extractAllIdsDeep,
   findElementById,
-  getPageConfigJsonPath,
-  parsePageConfigJson,
+  loadAndPreparePageConfig,
   stringifyPageConfigJson,
   writeFileAtomic,
 } from "../helpers/pageConfigJson.helpers.js";
@@ -16,41 +13,10 @@ export const createUpdateClassNameImpl = (deps: WorkspaceDeps) => {
     const id = String(elementId ?? "").trim();
     if (!id) return { success: false, error: "invalid element_id" };
 
-    let configPath: string;
-    try {
-      configPath = getPageConfigJsonPath(workspaceRoot, route);
-    } catch (err) {
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
+    const prep = await loadAndPreparePageConfig(workspaceRoot, route, fs);
+    if (!prep.success) return prep;
 
-    let before = "";
-    try {
-      before = await fs.readFile(configPath);
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException | null)?.code;
-      if (code === "ENOENT") return { success: false, error: "not found" };
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
-
-    let parsed: ReturnType<typeof parsePageConfigJson>;
-    try {
-      parsed = parsePageConfigJson(before);
-    } catch (err) {
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
-
-    const elements = parsed.elements ?? [];
-    const existingIds = extractAllIdsDeep(elements);
-    ensureElementIds(elements, existingIds);
+    const { configPath, elements } = prep;
 
     const el = findElementById(elements, id);
     if (!el) return { success: false, error: "element not found" };

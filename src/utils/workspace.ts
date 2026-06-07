@@ -1,7 +1,7 @@
 // infra/fs/workspace.ts
-import { Dirent } from "fs";
-import fs from "fs/promises";
-import path from "path";
+import { Dirent } from "node:fs";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 export async function createFolder(path: string) {
   await fs.mkdir(path, { recursive: true });
@@ -12,11 +12,7 @@ export async function removeFolder(path: string) {
 }
 
 export async function createFile(path: string, content: string) {
-  try {
-    await fs.writeFile(path, content, "utf-8");
-  } catch (err) {
-    throw err;
-  }
+  await fs.writeFile(path, content, "utf-8");
 }
 
 export async function removeFile(path: string) {
@@ -71,15 +67,15 @@ export async function readTsFiles(dir: string, results: any[] = []) {
   }
 
   const entries = await fs.readdir(dir);
-  const ALLOWED_EXT = [".ts", ".tsx"];
+  const ALLOWED_EXT = new Set([".ts", ".tsx"]);
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry);
     const stat = await fs.stat(fullPath);
 
     if (stat.isDirectory()) {
-      readTsFiles(fullPath, results);
-    } else if (ALLOWED_EXT.includes(path.extname(entry))) {
+      await readTsFiles(fullPath, results);
+    } else if (ALLOWED_EXT.has(path.extname(entry))) {
       results.push({
         name: entry,
         path: fullPath,

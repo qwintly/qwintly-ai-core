@@ -52,7 +52,7 @@ export const createCreateNewRouteImpl = (deps: WorkspaceDeps) => {
   const { workspaceRoot, fs: coreFs } = deps;
 
   return async (parentRoute: string, routeName: string) => {
-    const parentSegments = normalizeRouteSegments(parentRoute);
+    let parentSegments = normalizeRouteSegments(parentRoute);
     const routeSegment = String(routeName ?? "").trim();
 
     if (!isSafeSegment(routeSegment)) {
@@ -61,39 +61,53 @@ export const createCreateNewRouteImpl = (deps: WorkspaceDeps) => {
         error: "Invalid route name",
       } satisfies CreateNewRouteResult;
     }
+    // Check if the parentRoute is proper (all segments are safe).
+    // If not proper, create the new route under the '/' route.
     if (parentSegments.some((s) => !isSafeSegment(s))) {
-      return {
-        success: false,
-        error: "Invalid parent route",
-      } satisfies CreateNewRouteResult;
+      parentSegments = [];
     }
 
     const appDir = toWorkspacePath(workspaceRoot, "app");
-    const parentDir = path.join(appDir, ...parentSegments);
-    const finalDir = path.join(parentDir, routeSegment);
 
-    // Parent must exist (don't implicitly create arbitrary routes).
+    const ensureRouteExists = async (segments: string[]) => {
+      const parentDir = path.join(appDir, ...segments.slice(0, -1));
+      const seg = segments.slice(-1)[0];
+      const finalDir = path.join(parentDir, seg);
+
+      try {
+        const st = await coreFs.stat(finalDir);
+        if (st.isDirectory()) {
+          return;
+        }
+      } catch {}
+
+      const tmpDir = path.join(
+        parentDir,
+        `.qwintly_route_tmp_${seg}_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      );
+
+      await coreFs.mkdirp(tmpDir);
+      await coreFs.writeFile(path.join(tmpDir, "page.tsx"), PAGE_TSX_TEMPLATE);
+      await coreFs.writeFile(
+        path.join(tmpDir, "pageConfig.json"),
+        DEFAULT_PAGE_CONFIG,
+      );
+      await fs.rename(tmpDir, finalDir);
+    };
+
     try {
-      const st = await coreFs.stat(parentDir);
-      if (!st.isDirectory()) {
-        return {
-          success: false,
-          error: "Parent not a folder",
-        } satisfies CreateNewRouteResult;
+      for (let i = 1; i <= parentSegments.length; i++) {
+        await ensureRouteExists(parentSegments.slice(0, i));
       }
     } catch (err) {
-      const code = (err as NodeJS.ErrnoException | null)?.code;
-      if (code === "ENOENT") {
-        return {
-          success: false,
-          error: "Parent route missing",
-        } satisfies CreateNewRouteResult;
-      }
       return {
         success: false,
-        error: "Parent check failed",
+        error: `Failed to ensure parent route: ${err instanceof Error ? err.message : String(err)}`,
       } satisfies CreateNewRouteResult;
     }
+
+    const parentDir = path.join(appDir, ...parentSegments);
+    const finalDir = path.join(parentDir, routeSegment);
 
     // Route must not already exist.
     try {

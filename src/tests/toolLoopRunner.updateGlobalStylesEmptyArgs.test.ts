@@ -4,14 +4,12 @@ import { FunctionCallingConfigMode } from "@google/genai";
 import { runToolLoop } from "../ai/toolLoop/toolLoopRunner.js";
 
 test("tool loop: update_global_styles empty tokens is rejected without calling handler", async () => {
-  let handlerCalls = 0;
-
   let aiCalls = 0;
   const aiCall = async () => {
     aiCalls += 1;
     if (aiCalls === 1) {
       return {
-        functionCalls: [{ name: "update_global_styles", args: { tokens: {} } }],
+        functionCalls: [{ name: "update_global_styles", args: {} }],
       };
     }
     return { functionCalls: [], text: "ok" };
@@ -20,12 +18,7 @@ test("tool loop: update_global_styles empty tokens is rejected without calling h
   const res = await runToolLoop({
     initialContents: [],
     tools: [],
-    handlers: {
-      update_global_styles: async () => {
-        handlerCalls += 1;
-        return { success: true };
-      },
-    },
+    workspaceRoot: "/dummy/path",
     aiCall,
     logger: async () => {},
     toolCallingMode: FunctionCallingConfigMode.ANY,
@@ -33,7 +26,6 @@ test("tool loop: update_global_styles empty tokens is rejected without calling h
     keepFullTrace: false,
   });
 
-  assert.equal(handlerCalls, 0);
   assert.equal(res.finalText, "ok");
 
   const toolResponses = res.modelContents.filter(
@@ -49,6 +41,5 @@ test("tool loop: update_global_styles empty tokens is rejected without calling h
   )?.functionResponse?.response;
 
   assert.equal(fr?.success, false);
-  assert.match(String(fr?.error ?? ""), /must not be empty/i);
+  assert.match(String(fr?.error ?? ""), /at least one token/i);
 });
-

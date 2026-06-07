@@ -43,12 +43,16 @@ export const plannerPrompt = (params: PlanNodePromptParams) => {
       - read_file: read file
       - search: search codebase
       - list_dir: list dirs
+      - get_available_routes: Get available routes
       - submit_planner_tasks: Finalize planner output
 
       Styling guidance:
       - Codegen can call update_global_styles to modify app/styleConfig.json (global design tokens).
       - Prefer semantic Tailwind token classes (bg-background, text-foreground, border-border, ring-ring, etc.) so global styles are utilized.
-      - If a task requires changing theme tokens, specify exact update_global_styles args: {"tokens": {"<tokenKey>":"<cssString>"}} (never {"tokens":{}}).
+      - While updating global styles make sure that the styles updating (ex. background, foreground) are used in the right places. If not try including them by updating the classname
+      - If a task requires changing theme tokens, specify exact update_global_styles args as a flat object: {"<tokenKey>":"<cssString>"} (never {}).
+      - Try including images whereever needed in the task description. Also tell what the image should be.
+      - Task creation order must follow the visual reading flow of the interface, from top to bottom, if an incremental change needs to add a section before an existing section, explicitly mention to use "before_id" param to codegen agent.
     `,
   );
 

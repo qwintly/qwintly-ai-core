@@ -7,7 +7,7 @@ import {
 import type { ZodSchema } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
-const DEFAULT_MODEL = "gemini-2.5-flash-lite";
+export const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 
 type AIResponseOptions = {
   tools?: Tool[];
@@ -30,7 +30,7 @@ export class GenerateGeminiReponse {
     const {
       tools,
       schema,
-      toolCallingMode = FunctionCallingConfigMode.AUTO,
+      toolCallingMode = FunctionCallingConfigMode.ANY,
     } = options;
 
     const config: GenerateContentConfig = {};

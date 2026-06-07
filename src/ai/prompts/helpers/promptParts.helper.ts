@@ -12,7 +12,7 @@ export const projectStateNote = (isNewProject: boolean, role: PromptRole) => {
   if (role === "planner") {
     return isNewProject
       ? "The project you are given is currently a boilerplate project that contains some existing code. Create tasks to modify project according to PM plan and context; remove boilerplate traces."
-      : "Plan only latest PM changes; avoid rework";
+      : "Only create plans to implement changes which are not existing. Avoid rework. For example, if PM plan asks to create a new route or section which already exists, do not create a task for that";
   }
 
   return isNewProject

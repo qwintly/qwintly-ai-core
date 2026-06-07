@@ -84,10 +84,9 @@ export function assertStyleConfig(config: unknown): StyleConfig {
     (k) => !(STYLE_TOKEN_KEYS as readonly string[]).includes(k),
   );
   if (extraKeys.length) {
+    extraKeys.sort((a, b) => a.localeCompare(b));
     throw new Error(
-      `styleConfig.tokens contains unknown keys: ${extraKeys
-        .sort()
-        .join(", ")}`,
+      `styleConfig.tokens contains unknown keys: ${extraKeys.join(", ")}`,
     );
   }
 

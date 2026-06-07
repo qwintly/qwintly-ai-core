@@ -10,8 +10,7 @@ export const CreateNewRouteSchema = {
       parent_route: {
         type: Type.STRING,
         // Accept both "/dashboard" and "dashboard" (caller might omit the leading slash).
-        pattern:
-          "^(?:/|/(?:[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)?|[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)$",
+        pattern: String.raw`^(?:/|/(?:[A-Za-z0-9_.[\\\]-]+(?:/[A-Za-z0-9_.[\\\]-]+)*)?|[A-Za-z0-9_.[\\\]-]+(?:/[A-Za-z0-9_.[\\\]-]+)*)$`,
         description:
           'The parent route ("/" for app root). Example: "/" or "/dashboard". If you forget the leading "/", it will be assumed (e.g. "dashboard" -> "/dashboard"). NEVER pass empty string, use "/" if not sure about parent route.',
       },

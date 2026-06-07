@@ -1,11 +1,8 @@
 import { resolveUnsplashImageForElement } from "../../../image/unsplash.service.js";
 import type { BuilderElement, OnClickAction } from "../../../types/elements.js";
 import {
-  ensureElementIds,
-  extractAllIdsDeep,
   findElementById,
-  getPageConfigJsonPath,
-  parsePageConfigJson,
+  loadAndPreparePageConfig,
   stringifyPageConfigJson,
   writeFileAtomic,
 } from "../helpers/pageConfigJson.helpers.js";
@@ -62,41 +59,10 @@ export const createUpdatePropsImpl = (deps: WorkspaceDeps) => {
     const id = String(args?.element_id ?? "").trim();
     if (!id) return { success: false, error: "invalid element_id" };
 
-    let configPath: string;
-    try {
-      configPath = getPageConfigJsonPath(workspaceRoot, args.route);
-    } catch (err) {
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
+    const prep = await loadAndPreparePageConfig(workspaceRoot, args.route, fs);
+    if (!prep.success) return prep;
 
-    let before = "";
-    try {
-      before = await fs.readFile(configPath);
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException | null)?.code;
-      if (code === "ENOENT") return { success: false, error: "not found" };
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
-
-    let parsed: ReturnType<typeof parsePageConfigJson>;
-    try {
-      parsed = parsePageConfigJson(before);
-    } catch (err) {
-      return {
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
-
-    const elements = parsed.elements ?? [];
-    const existingIds = extractAllIdsDeep(elements);
-    ensureElementIds(elements, existingIds);
+    const { configPath, elements } = prep;
 
     const el = findElementById(elements, id);
     if (!el) return { success: false, error: "element not found" };

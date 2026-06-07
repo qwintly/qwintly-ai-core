@@ -1,22 +1,33 @@
 import { FunctionCallingConfigMode, Tool } from "@google/genai";
+import type { GenTokensRepository } from "../../repository/genTokens.repository.js";
 import { persistToolCall } from "../../services/toolcallPersist.service.js";
 import { EVENT_TYPES, EventType } from "../../types/events.js";
+import { STYLE_TOKEN_KEYS } from "../../types/styleConfig.js";
+import { createWorkspaceToolImpls } from "../tools/implementations/factories.js";
+import { aiCallWithRetry } from "./helpers/aiCall.helper.js";
+import { serializeError } from "./helpers/errors.helper.js";
+import { nodeFs } from "./helpers/fsHelpers.js";
+import { handleApplyPatchFailure } from "./helpers/patchRetry.helper.js";
+import {
+  extractUsageTokenCounts,
+  persistTokensOnce,
+} from "./helpers/persistTokens.helpers.js";
+import { extractThoughtSignatures } from "./helpers/signatures.helper.js";
+import { normalizeToolArgs } from "./helpers/toolArgs.helper.js";
+import {
+  executeToolHandler,
+  postProcessToolResult,
+} from "./helpers/toolExecution.helper.js";
+import { createToolHandlers } from "./helpers/toolHandlers.helper.js";
+import { recordToolEvent } from "./toolEventSummary.js";
 import {
   compactForModel,
   DEFAULT_CONTEXT_POLICY,
-  normalizeReadFileArgs,
   redactFunctionCallArgs,
   ToolEvent,
   ToolLoopContextPolicy,
 } from "./toolLoopContext.js";
-import {
-  aiCallWithRetry,
-  buildToolStatusMessage,
-  recordToolEvent,
-  serializeError,
-} from "./toolLoopRunnerUtils.js";
-
-export type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
+import { buildToolStatusMessage } from "./toolStatusMessage.js";
 
 export type ToolLoopResult = {
   contents: any[];
@@ -30,7 +41,11 @@ export type ToolLoopResult = {
   };
 };
 
-export type Logger = (message: string, eventType: EventType) => Promise<void>;
+export type Logger = (
+  message: string,
+  eventType: EventType,
+  displayedSummary?: boolean,
+) => Promise<void>;
 
 export type AiCallResponse = {
   functionCalls?: any[];
@@ -46,10 +61,16 @@ export type AiCallFn = (
   },
 ) => Promise<AiCallResponse>;
 
+export type TokenPersistence = {
+  repository: Pick<GenTokensRepository, "persistGenTokens">;
+  sessionId: string;
+  model: string;
+};
+
 export type RunToolLoopOptions = {
   initialContents: any[];
   tools: Tool[];
-  handlers: Record<string, ToolHandler>;
+  workspaceRoot: string;
   maxSteps?: number;
   toolCallingMode?: FunctionCallingConfigMode;
   terminalToolNames?: string[];
@@ -62,18 +83,20 @@ export type RunToolLoopOptions = {
   aiCallAutoRetryBaseMs?: number;
   aiCallAutoRetryMaxMs?: number;
   persistResponse?: (modelInput: any, modelOutput: any) => Promise<void>;
+  tokenPersistence?: TokenPersistence;
 };
 
 export async function runToolLoop(
   options: RunToolLoopOptions,
 ): Promise<ToolLoopResult> {
-  const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-    typeof value === "object" && value !== null && !Array.isArray(value);
+  const styleTokenKeySet = new Set<string>(
+    STYLE_TOKEN_KEYS as unknown as string[],
+  );
 
   const {
     initialContents,
     tools,
-    handlers,
+    workspaceRoot,
     maxSteps = 30,
     toolCallingMode = FunctionCallingConfigMode.ANY,
     terminalToolNames = [],
@@ -86,7 +109,22 @@ export async function runToolLoop(
     aiCallAutoRetryBaseMs = 400,
     aiCallAutoRetryMaxMs = 10_000,
     persistResponse,
+    tokenPersistence,
   } = options;
+
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let sawAnyTokenUsage = false;
+
+  const impls = createWorkspaceToolImpls({
+    workspaceRoot,
+    fs: nodeFs,
+  });
+
+  const toolHandlers = createToolHandlers({
+    impls,
+    workspaceRoot,
+  });
 
   if (typeof aiCall !== "function") {
     throw new Error("Tool loop: aiCall is required.");
@@ -192,8 +230,23 @@ export async function runToolLoop(
       }
     }
 
+    {
+      const usage = extractUsageTokenCounts(response);
+      if (usage) {
+        sawAnyTokenUsage = true;
+        totalInputTokens += usage.inputTokens;
+        totalOutputTokens += usage.outputTokens;
+      }
+    }
+
     const functionCalls = response.functionCalls ?? [];
     if (functionCalls.length === 0) {
+      await persistTokensOnce(
+        tokenPersistence,
+        sawAnyTokenUsage,
+        totalInputTokens,
+        totalOutputTokens,
+      );
       return {
         contents: keepFullTrace ? fullTraceContents : modelContents,
         modelContents,
@@ -202,27 +255,7 @@ export async function runToolLoop(
       };
     }
 
-    const signatureById = (() => {
-      try {
-        const candidates = Array.isArray((response as any)?.candidates)
-          ? ((response as any).candidates as any[])
-          : [];
-        const parts = candidates?.[0]?.content?.parts;
-        const arr = Array.isArray(parts) ? (parts as any[]) : [];
-        const map = new Map<string, string>();
-        for (const p of arr) {
-          const fc = p?.functionCall;
-          const id = fc?.id;
-          const sig = p?.thoughtSignature ?? p?.thought_signature;
-          if (typeof id === "string" && typeof sig === "string" && sig) {
-            map.set(id, sig);
-          }
-        }
-        return map;
-      } catch {
-        return new Map<string, string>();
-      }
-    })();
+    const signatureById = extractThoughtSignatures(response);
 
     for (let callIndex = 0; callIndex < functionCalls.length; callIndex++) {
       const call = functionCalls[callIndex];
@@ -260,40 +293,21 @@ export async function runToolLoop(
         continue;
       }
 
-      const handler = handlers[name];
-      const handlerMissingResult = !handler
-        ? {
-            success: false,
-            error: `No handler registered for "${name}".`,
-            error_detail: {
-              name: "MissingToolHandlerError",
-              message: `No handler registered for "${name}".`,
-            },
-          }
-        : null;
+      const handler = toolHandlers[name];
 
-      let effectiveArgs: Record<string, unknown> = args;
-      let readFileMeta: {
-        start: number;
-        end: number;
-        wasCapped: boolean;
-      } | null = null;
-      if (name === "read_file") {
-        const normalized = normalizeReadFileArgs(
-          effectiveArgs,
-          policy.readFileDefaultMaxLines,
-        );
-        effectiveArgs = normalized.effectiveArgs;
-        readFileMeta = {
-          start: normalized.start,
-          end: normalized.end,
-          wasCapped: normalized.wasCapped,
-        };
-      }
+      const { effectiveArgs, readFileMeta } = normalizeToolArgs(
+        name,
+        args,
+        {
+          readFileDefaultMaxLines: policy.readFileDefaultMaxLines,
+          styleTokenKeySet,
+        }
+      );
 
       logger(
         buildToolStatusMessage(name, effectiveArgs, readFileMeta),
         EVENT_TYPES.STEP_STARTED,
+        true,
       );
 
       const modelArgs = redactFunctionCallArgs(name, effectiveArgs);
@@ -304,7 +318,10 @@ export async function runToolLoop(
           args: effectiveArgs,
         },
         ...(thoughtSignature
-          ? { thoughtSignature: thoughtSignature, thought_signature: thoughtSignature }
+          ? {
+              thoughtSignature: thoughtSignature,
+              thought_signature: thoughtSignature,
+            }
           : {}),
       };
 
@@ -314,7 +331,10 @@ export async function runToolLoop(
           args: modelArgs,
         },
         ...(thoughtSignature
-          ? { thoughtSignature: thoughtSignature, thought_signature: thoughtSignature }
+          ? {
+              thoughtSignature: thoughtSignature,
+              thought_signature: thoughtSignature,
+            }
           : {}),
       };
 
@@ -342,76 +362,22 @@ export async function runToolLoop(
         pushModelOnly(assistantModel);
       }
 
-      let toolResultRaw: unknown;
-      if (handlerMissingResult) {
-        toolResultRaw = handlerMissingResult;
-      } else {
-        try {
-          if (name === "update_global_styles") {
-            const tokens = (effectiveArgs as any)?.tokens;
-            if (isPlainObject(tokens) && Object.keys(tokens).length === 0) {
-              toolResultRaw = {
-                success: false,
-                error: "tokens patch must not be empty",
-                error_detail: {
-                  name: "InvalidToolArgumentsError",
-                  message:
-                    "update_global_styles requires at least one token key/value (e.g. { tokens: { radius: \"0.75rem\" } }).",
-                },
-                note: "Resend update_global_styles with at least one token key/value, or skip this tool call.",
-              };
-            } else {
-              toolResultRaw = await handler(effectiveArgs);
-            }
-          } else {
-            toolResultRaw = await handler(effectiveArgs);
-          }
-        } catch (err) {
-          logger(`AI tool: ${name} failed`, EVENT_TYPES.STEP_ERROR);
-          console.error("Tool loop: handler threw", err, {
-            tool: name,
-            step: step + 1,
-          });
-          toolResultRaw = {
-            success: false,
-            error: err instanceof Error ? err.message : String(err),
-            error_detail: serializeError(err),
-            note: "Tool handler threw. Inspect error_detail and retry with corrected args or a different approach.",
-          };
-        }
-      }
-      let toolResult: unknown = toolResultRaw;
+      const toolResultRaw = await executeToolHandler({
+        name,
+        handler,
+        effectiveArgs,
+        styleTokenKeySet,
+        step: step + 1,
+        logger,
+      });
 
-      if (name === "read_file" && readFileMeta) {
-        const path = String(effectiveArgs.path ?? "");
-
-        const jsonPayload =
-          (toolResultRaw as any)?.kind === "json"
-            ? (toolResultRaw as any)?.json
-            : undefined;
-        if (jsonPayload !== undefined) {
-          // Token-efficient: return JSON as structured data (no double-stringifying).
-          toolResult = { path, json: jsonPayload };
-        } else {
-          const rawContent =
-            typeof (toolResultRaw as any)?.content === "string"
-              ? String((toolResultRaw as any).content)
-              : typeof toolResultRaw === "string"
-                ? toolResultRaw
-                : JSON.stringify(toolResultRaw ?? null);
-
-          toolResult = {
-            path,
-            start_line: readFileMeta.start,
-            end_line: readFileMeta.end,
-            truncated: readFileMeta.wasCapped,
-            content: rawContent,
-            note: readFileMeta.wasCapped
-              ? `Capped to ${policy.readFileDefaultMaxLines} lines. Request more with start_line/end_line.`
-              : undefined,
-          };
-        }
-      }
+      const toolResult = postProcessToolResult({
+        name,
+        toolResultRaw,
+        effectiveArgs,
+        readFileMeta,
+        readFileDefaultMaxLines: policy.readFileDefaultMaxLines,
+      });
 
       try {
         await persistToolCall(name, modelArgs, toolResult);
@@ -445,44 +411,15 @@ export async function runToolLoop(
         applyPatchAutoRetryMax > 0 &&
         applyPatchRetryCount < applyPatchAutoRetryMax
       ) {
-        applyPatchRetryCount += 1;
-
-        const error = String((toolResult as any)?.error ?? "unknown error");
-        const debugFiles = Array.isArray((toolResult as any)?.debug?.files)
-          ? ((toolResult as any).debug.files as Array<{
-              path?: string;
-              head?: string;
-            }>)
-          : [];
-
-        const debugText =
-          debugFiles.length > 0
-            ? `\n\nFILE SNAPSHOTS (for regenerating the patch):\n${debugFiles
-                .slice(0, 3)
-                .map(
-                  (f) =>
-                    `--- ${String(f.path ?? "")} ---\n${String(
-                      f.head ?? "",
-                    )}\n--- end ---`,
-                )
-                .join("\n\n")}`
-            : "";
-
-        const retryInstruction = {
-          role: "user",
-          parts: [
-            {
-              text:
-                `apply_patch failed (attempt ${applyPatchRetryCount}/${applyPatchAutoRetryMax}): ${error}\n` +
-                `Regenerate a patch that matches the current file contents. ` +
-                `For large rewrites, prefer write_file(path, content) or Delete+Add instead of Update.` +
-                debugText,
-            },
-          ],
-        };
-
-        if (keepFullTrace) fullTraceContents.push(retryInstruction);
-        modelContents.push(retryInstruction);
+        const failureResult = handleApplyPatchFailure({
+          toolResult,
+          applyPatchAutoRetryMax,
+          applyPatchRetryCount,
+          keepFullTrace,
+          fullTraceContents,
+          modelContents,
+        });
+        applyPatchRetryCount = failureResult.applyPatchRetryCount;
       }
 
       recordToolEvent({
@@ -496,6 +433,12 @@ export async function runToolLoop(
       });
 
       if (terminalToolNames.includes(name)) {
+        await persistTokensOnce(
+          tokenPersistence,
+          sawAnyTokenUsage,
+          totalInputTokens,
+          totalOutputTokens,
+        );
         return {
           contents: keepFullTrace ? fullTraceContents : modelContents,
           modelContents,
@@ -507,6 +450,12 @@ export async function runToolLoop(
     }
   }
 
+  await persistTokensOnce(
+    tokenPersistence,
+    sawAnyTokenUsage,
+    totalInputTokens,
+    totalOutputTokens,
+  );
   return {
     contents: keepFullTrace ? fullTraceContents : modelContents,
     modelContents,

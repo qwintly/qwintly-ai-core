@@ -30,11 +30,15 @@ export type PatchHunk = {
 
 const normalizeNewlines = (value: string) => value.replace(/\r\n/g, "\n");
 
-const normalizeLineForLooseMatch = (value: string) =>
-  value
-    .replace(/[ \t]+$/g, "")
+const normalizeLineForLooseMatch = (value: string) => {
+  let trimmed = value;
+  while (trimmed.endsWith(" ") || trimmed.endsWith("\t")) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  return trimmed
     .replace(/;$/g, "")
     .replace(/['"]/g, '"');
+};
 
 const normalizeLineForWhitespaceAgnosticMatch = (value: string) =>
   normalizeLineForLooseMatch(value).trim().replace(/\s+/g, " ");

@@ -52,8 +52,8 @@ export const createApplyPatchImpl = (deps: WorkspaceDeps) => {
       const normalized = (patch ?? "").replace(/\r\n/g, "\n");
       for (const line of normalized.split("\n")) {
         const match =
-          /^\*\*\* (Update File|Add File|Delete File):\s+(.+)$/.exec(line.trim()) ??
-          /^\*\*\* Move to:\s+(.+)$/.exec(line.trim());
+          /^\*\*\* (Update File|Add File|Delete File):\s+(\S.*)$/.exec(line.trim()) ??
+          /^\*\*\* Move to:\s+(\S.*)$/.exec(line.trim());
         if (!match) continue;
         const p = (match[2] ?? match[1] ?? "").trim();
         if (!p || seen.has(p)) continue;

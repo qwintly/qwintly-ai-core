@@ -1,7 +1,12 @@
 import path from "node:path";
 
-const normalizeForPrefixCheck = (value: string) =>
-  value.replace(/\\/g, "/").replace(/\/+$/g, "");
+const normalizeForPrefixCheck = (value: string) => {
+  let normalized = value.replace(/\\/g, "/");
+  while (normalized.endsWith("/")) {
+    normalized = normalized.slice(0, -1);
+  }
+  return normalized;
+};
 
 const stripKnownWorkspacePrefix = (inputPath: string, workspaceRoot: string) => {
   const inputNormalized = normalizeForPrefixCheck(inputPath);

@@ -26,8 +26,8 @@ const isInternalRoutePath = (value: string) => {
   const s = normalizeInternalRoutePath(value);
   if (!s) return false;
   if (s.includes("\\")) return false;
-  // Allow "/" or "/a" or "/a/b-c_d"
-  return /^\/(?:[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*)?$/.test(s);
+  // Allow "/" or "/a" or "/a/b-c_d" or "/product/[id]" or "/blog/[...slug]" or "/blog/[[...slug]]"
+  return /^\/(?:[A-Za-z0-9_.[\]-]+(?:\/[A-Za-z0-9_.[\]-]+)*)?$/.test(s);
 };
 
 export const OnClickActionZod = z.discriminatedUnion("kind", [
@@ -54,29 +54,31 @@ export const OnClickActionZod = z.discriminatedUnion("kind", [
   }),
 ]);
 
-export const BuilderElementZod: z.ZodType<any> = z.object({
+const BuilderElementPropsZod = z
+  .object({
+    onClick: OnClickActionZod.optional(),
+    text: z.string().optional(),
+    href: z.string().optional(),
+    placeholder: z.string().optional(),
+    alt: z.string().optional(),
+    target: z.string().optional(),
+    rel: z.string().optional(),
+    value: z.string().optional(),
+    type: z.string().optional(),
+    name: z.string().optional(),
+    size: z.number().optional(),
+    color: z.string().optional(),
+    strokeWidth: z.number().optional(),
+  })
+  .passthrough();
+
+export const FlatBuilderElementZod = z.object({
+  id: z.string().min(1),
+  parentId: z.string().min(1),
   type: z.enum(ELEMENT_TYPES),
   className: z.string().optional(),
   visible: z.boolean().optional(),
-  props: z
-    .object({
-      onClick: OnClickActionZod.optional(),
-      text: z.string().optional(),
-      href: z.string().optional(),
-      placeholder: z.string().optional(),
-      alt: z.string().optional(),
-      target: z.string().optional(),
-      rel: z.string().optional(),
-      value: z.string().optional(),
-      type: z.string().optional(),
-      name: z.string().optional(),
-      size: z.number().optional(),
-      color: z.string().optional(),
-      strokeWidth: z.number().optional(),
-    })
-    .passthrough()
-    .optional(),
-  children: z.array(z.lazy(() => BuilderElementZod)).optional(),
+  props: BuilderElementPropsZod.optional(),
 });
 
 export const InsertElementArgsZod = z.object({
@@ -92,5 +94,5 @@ export const InsertElementArgsZod = z.object({
   ),
   parent_id: z.string().min(1),
   before_id: z.string().min(1).optional(),
-  element: BuilderElementZod,
+  elements: z.array(FlatBuilderElementZod).min(1),
 });

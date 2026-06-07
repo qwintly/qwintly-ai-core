@@ -30,6 +30,15 @@ const defaultExecRg: NonNullable<SearchDeps["execRg"]> = async ({ query, cwd, ma
 
     let stdout = "";
     let stderr = "";
+    let resolvedOrRejected = false;
+
+    const timeoutId = setTimeout(() => {
+      if (!resolvedOrRejected) {
+        resolvedOrRejected = true;
+        child.kill();
+        reject(new Error("ripgrep search timed out after 6 seconds"));
+      }
+    }, 6000);
 
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -42,11 +51,19 @@ const defaultExecRg: NonNullable<SearchDeps["execRg"]> = async ({ query, cwd, ma
     });
 
     child.on("error", (err) => {
-      reject(err);
+      if (!resolvedOrRejected) {
+        resolvedOrRejected = true;
+        clearTimeout(timeoutId);
+        reject(err);
+      }
     });
 
     child.on("close", (code) => {
-      resolve({ code: code ?? 0, stdout, stderr });
+      if (!resolvedOrRejected) {
+        resolvedOrRejected = true;
+        clearTimeout(timeoutId);
+        resolve({ code: code ?? 0, stdout, stderr });
+      }
     });
   });
 };

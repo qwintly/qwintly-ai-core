@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { BuilderElement } from "../types/elements.js";
 
 export interface ResolvedImage {
@@ -22,6 +22,22 @@ let unsplashConfig: UnsplashConfig | null = null;
 
 const cache = new Map<string, ResolvedImage>();
 
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 5000);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 export function initUnsplash(
   config: Partial<UnsplashConfig> | null | undefined,
 ) {
@@ -33,8 +49,13 @@ export function initUnsplash(
     return;
   }
 
+  let cleanedUrl = url;
+  while (cleanedUrl.endsWith("/")) {
+    cleanedUrl = cleanedUrl.slice(0, -1);
+  }
+
   unsplashConfig = {
-    url: url.replace(/\/+$/, ""),
+    url: cleanedUrl,
     accessKey,
   };
 }
@@ -73,11 +94,11 @@ export async function searchUnsplashImage(
   }
 
   const params = new URLSearchParams({
-    imgQuery,
+    query: imgQuery,
     per_page: "10",
   });
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${cfg.url}/search/photos?${params.toString()}`,
     {
       headers: {
@@ -110,7 +131,7 @@ export async function searchUnsplashImage(
   // Required by Unsplash API terms
   // Tracks image download usage
   if (selected.links.download_location) {
-    await fetch(selected.links.download_location, {
+    await fetchWithTimeout(selected.links.download_location, {
       headers: {
         Authorization: `Client-ID ${cfg.accessKey}`,
       },
@@ -151,13 +172,17 @@ export const resolveUnsplashImageForElement = async (
   }
   try {
     const resolved = await searchUnsplashImage(query);
-    if (!resolved?.imageUrl) return;
+    if (!resolved?.imageUrl) {
+      console.log(resolved);
+      return;
+    }
 
     const anyEl = el as any;
     if (!anyEl.props || typeof anyEl.props !== "object") anyEl.props = {};
     anyEl.props.src = resolved.imageUrl;
     anyEl.props.alt = query;
-  } catch {
+  } catch (error) {
+    console.error(error);
     // Ignore Unsplash lookup errors and still allow prop updates.
   }
 };
@@ -169,7 +194,7 @@ export const resolveUnsplashImagesDeep = async (
 
   if (anyEl?.type === "image") {
     const alt = String(anyEl?.props?.alt ?? "").trim();
-    resolveUnsplashImageForElement(el, alt);
+    await resolveUnsplashImageForElement(el, alt);
   }
 
   const kids = anyEl?.children;

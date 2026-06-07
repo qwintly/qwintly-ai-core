@@ -8,17 +8,19 @@ export const UpdateGlobalStylesSchema = {
   parameters: {
     type: Type.OBJECT,
     properties: {
-      tokens: {
-        type: Type.OBJECT,
-        description:
-          `Args must be exactly: {"tokens": {"<tokenKey>":"<cssString>", ...}}. ` +
-          `Partial tokens patch (must include at least 1 key; never {"tokens":{}}). Allowed keys: ${STYLE_TOKEN_KEYS.join(
-            ", ",
-          )}. Values must be non-empty safe CSS strings (e.g. '0.75rem' or 'oklch(0.62 0.16 199.4)'). Unknown keys are rejected.`,
-        minProperties: "1",
-        additionalProperties: { type: Type.STRING },
-      },
+      ...Object.fromEntries(
+        STYLE_TOKEN_KEYS.map((k) => [
+          k,
+          {
+            type: Type.STRING,
+            description:
+              "CSS value string for this token (e.g. '0.75rem' or 'oklch(0.62 0.16 199.4)'). Omit keys you don't want to change.",
+          },
+        ]),
+      ),
     },
-    required: ["tokens"],
+    description:
+      `Args are a flat object where each key is an optional token name; include at least 1 key. Use background for background color and foreground for text color, radius for border radius, etc.` +
+      `Allowed keys: ${STYLE_TOKEN_KEYS.join(", ")}.`,
   },
 };

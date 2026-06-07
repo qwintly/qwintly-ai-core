@@ -3,6 +3,7 @@ import { ReadFileSchema } from "../schemas/readFile.schema.js";
 import { SearchSchema } from "../schemas/search.schema.js";
 import { ListDirSchema } from "../schemas/listDir.schema.js";
 import { SubmitPlannerTasksSchema } from "../schemas/submitPlannerTasks.schema.js";
+import { GetAvailableRoutesSchema } from "../schemas/getAvailableRoutes.schema.js";
 
 export const plannerTools = (): Tool[] => {
   return [
@@ -11,6 +12,7 @@ export const plannerTools = (): Tool[] => {
         ReadFileSchema,
         SearchSchema,
         ListDirSchema,
+        GetAvailableRoutesSchema,
         SubmitPlannerTasksSchema,
       ],
     },

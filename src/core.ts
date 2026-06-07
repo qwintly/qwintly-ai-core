@@ -3,7 +3,6 @@ import { getClient } from "./ai/generate/generateClient.js";
 import {
   runToolLoop,
   RunToolLoopOptions,
-  ToolHandler,
   ToolLoopResult,
 } from "./ai/toolLoop/toolLoopRunner.js";
 import { initUnsplash } from "./image/unsplash.service.js";
@@ -15,6 +14,7 @@ import { statusService } from "./logging/genStatus.service.js";
 import { SendStatusToRedis } from "./logging/redis.service.js";
 import { ContextRepository } from "./repository/context.repository.js";
 import { GenStatusRepository } from "./repository/genStatus.repository.js";
+import { GenTokensRepository } from "./repository/genTokens.repository.js";
 import { ProjectOpsRepository } from "./repository/projectOperations.repository.js";
 import { applyOperations } from "./services/syncEditOps.service.js";
 import { initializeToolCallsRepository } from "./services/toolcallPersist.service.js";
@@ -26,6 +26,7 @@ import {
 } from "./types/index/index.types.js";
 import type { ProjectInfo } from "./types/projectInfo.types.js";
 import { assertNonEmptyString } from "./utils/utils.js";
+import { DEFAULT_MODEL } from "./ai/generate/gemini.client.js";
 
 export type QwintlyCoreOptions = {
   chatId: string;
@@ -60,12 +61,14 @@ export class QwintlyCore {
   public readonly workspacePath: string;
   public readonly source: string;
   public readonly step: GenStep;
+  public readonly geminiModel: string;
 
   private readonly aiClient?: AiClient;
   private readonly statusRepo: GenStatusRepository;
   private readonly ctxRepo: ContextRepository;
   private readonly redisStatusPublisher: SendStatusToRedis;
   private readonly projectOpsRepo: ProjectOpsRepository;
+  private readonly genTokensRepo: GenTokensRepository;
 
   constructor(options: QwintlyCoreOptions) {
     assertNonEmptyString(options.chatId, "chatId");
@@ -99,6 +102,8 @@ export class QwintlyCore {
       ) as AiClient;
     }
 
+    this.geminiModel = options.gemini?.model ?? DEFAULT_MODEL;
+
     this.statusRepo = new GenStatusRepository(
       options.supabase.endpoint,
       options.supabase.secret,
@@ -108,6 +113,10 @@ export class QwintlyCore {
       options.supabase.secret,
     );
     this.projectOpsRepo = new ProjectOpsRepository(
+      options.supabase.endpoint,
+      options.supabase.secret,
+    );
+    this.genTokensRepo = new GenTokensRepository(
       options.supabase.endpoint,
       options.supabase.secret,
     );
@@ -129,7 +138,6 @@ export class QwintlyCore {
   public async runAiFlow(
     initialContents: any[],
     tools: Tool[],
-    handlers: Record<string, ToolHandler>,
     maxSteps: number,
     terminalToolNames: string[],
     persistResponse?: (modelInput: any, modelOutput: any) => Promise<void>,
@@ -142,7 +150,7 @@ export class QwintlyCore {
     const toolLoopOptions: RunToolLoopOptions = {
       initialContents: initialContents,
       tools: tools,
-      handlers: handlers,
+      workspaceRoot: this.workspacePath,
       maxSteps: maxSteps,
       terminalToolNames: terminalToolNames,
       aiCall: (request, options) =>
@@ -152,6 +160,11 @@ export class QwintlyCore {
         }),
       logger: this.streamLog.bind(this),
       persistResponse,
+      tokenPersistence: {
+        repository: this.genTokensRepo,
+        sessionId: this.sessionId,
+        model: this.geminiModel,
+      },
     };
 
     const result = await runToolLoop(toolLoopOptions);
