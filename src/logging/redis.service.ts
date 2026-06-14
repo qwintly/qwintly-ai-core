@@ -36,12 +36,6 @@ export class SendStatusToRedis {
       },
     );
 
-    await this.upstashClient.hset(`chat:${chatId}:state:${genId}`, {
-      event_type: event.event_type,
-      step: event.step ?? "",
-      message: event.message ?? "",
-      seq_num: event.seq_num.toString(),
-      last_seq: event.seq_num.toString(),
-    });
+    await this.upstashClient.expire(streamKey, 24 * 60 * 60);
   };
 }

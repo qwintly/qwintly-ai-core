@@ -1,4 +1,5 @@
 import { FunctionCallingConfigMode, Tool } from "@google/genai";
+import { DEFAULT_MODEL } from "./ai/generate/gemini.client.js";
 import { getClient } from "./ai/generate/generateClient.js";
 import {
   runToolLoop,
@@ -26,7 +27,6 @@ import {
 } from "./types/index/index.types.js";
 import type { ProjectInfo } from "./types/projectInfo.types.js";
 import { assertNonEmptyString } from "./utils/utils.js";
-import { DEFAULT_MODEL } from "./ai/generate/gemini.client.js";
 
 export type QwintlyCoreOptions = {
   chatId: string;
@@ -69,6 +69,7 @@ export class QwintlyCore {
   private readonly redisStatusPublisher: SendStatusToRedis;
   private readonly projectOpsRepo: ProjectOpsRepository;
   private readonly genTokensRepo: GenTokensRepository;
+  private statusSeqNum = 0;
 
   constructor(options: QwintlyCoreOptions) {
     assertNonEmptyString(options.chatId, "chatId");
@@ -99,7 +100,7 @@ export class QwintlyCore {
         "gemini",
         options.gemini.apiKey,
         options.gemini.model,
-      ) as AiClient;
+      );
     }
 
     this.geminiModel = options.gemini?.model ?? DEFAULT_MODEL;
@@ -178,14 +179,15 @@ export class QwintlyCore {
   ): Promise<void> {
     try {
       assertNonEmptyString(message, "message");
-      await statusService(
-        this.chatId,
-        this.sessionId,
+      this.statusSeqNum++;
+      statusService({
+        chatId: this.chatId,
+        sessionId: this.sessionId,
         eventType,
-        this.step,
+        step: this.step,
         message,
-        this.source,
-        {
+        source: this.source,
+        deps: {
           repository: {
             persist: this.statusRepo.persistStatusMessage.bind(this.statusRepo),
           },
@@ -196,7 +198,10 @@ export class QwintlyCore {
           },
         },
         displayedSummary,
-      );
+        seqNum: this.statusSeqNum,
+      }).catch((error) => {
+        console.error("Status service background error:", error);
+      });
     } catch (error) {
       console.error(error);
     }

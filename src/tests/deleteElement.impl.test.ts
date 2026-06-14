@@ -111,3 +111,40 @@ test("delete_element: parse failure returns success=false", async () => {
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
+
+test("delete_element: fails if attempting to delete the root element", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-"));
+  try {
+    const routeDir = path.join(workspaceRoot, "app", "a");
+    await fs.mkdir(routeDir, { recursive: true });
+    const filePath = path.join(routeDir, "pageConfig.json");
+    await fs.writeFile(
+      filePath,
+      JSON.stringify(
+        {
+          elements: [
+            {
+              id: "root",
+              type: "div",
+              children: [],
+            },
+          ],
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf-8",
+    );
+
+    const impl = createDeleteElementImpl({ workspaceRoot, fs: makeRealFs() } as any);
+    const res = await impl("/a", "root");
+    assert.equal((res as any).success, false);
+    assert.equal((res as any).error, "Cannot delete the root element");
+
+    const after = await fs.readFile(filePath, "utf-8");
+    assert.ok(after.includes('"root"'));
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});
+

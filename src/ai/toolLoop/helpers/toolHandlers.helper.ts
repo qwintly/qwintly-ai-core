@@ -64,20 +64,24 @@ export function createToolHandlers(params: {
       return result;
     },
     update_props: async (args) => {
-      const route = String(args.route ?? "");
-      const element_id = String(args.element_id ?? "");
-      const props: any = args.props;
+      const { route, element_id, props, ...rest } = args;
+      const routeStr = String(route ?? "");
+      const elementIdStr = String(element_id ?? "");
+      const mergedProps = {
+        ...(typeof props === "object" && props !== null ? props : {}),
+        ...rest,
+      };
       const result = await params.impls.updatePropsImpl({
-        route,
-        element_id,
-        ...props,
+        route: routeStr,
+        element_id: elementIdStr,
+        ...mergedProps,
       });
       return result;
     },
     update_classname: async (args) => {
       const route = String(args.route ?? "");
       const element_id = String(args.element_id ?? "");
-      const class_name = String(args.class_name ?? "");
+      const class_name = String(args.className ?? args.class_name ?? "");
       const result = await params.impls.updateClassNameImpl(
         route,
         element_id,

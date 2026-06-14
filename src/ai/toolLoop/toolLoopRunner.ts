@@ -39,6 +39,7 @@ export type ToolLoopResult = {
     args: Record<string, unknown>;
     response: unknown;
   };
+  success: boolean;
 };
 
 export type Logger = (
@@ -89,9 +90,7 @@ export type RunToolLoopOptions = {
 export async function runToolLoop(
   options: RunToolLoopOptions,
 ): Promise<ToolLoopResult> {
-  const styleTokenKeySet = new Set<string>(
-    STYLE_TOKEN_KEYS as unknown as string[],
-  );
+  const styleTokenKeySet = new Set<string>(STYLE_TOKEN_KEYS);
 
   const {
     initialContents,
@@ -127,7 +126,7 @@ export async function runToolLoop(
   });
 
   if (typeof aiCall !== "function") {
-    throw new Error("Tool loop: aiCall is required.");
+    throw new TypeError("Tool loop: aiCall is required.");
   }
 
   const policy: Required<ToolLoopContextPolicy> = {
@@ -252,20 +251,20 @@ export async function runToolLoop(
         modelContents,
         finalText: (response.text ?? "").trim(),
         steps: step + 1,
+        success: false,
       };
     }
 
     const signatureById = extractThoughtSignatures(response);
 
-    for (let callIndex = 0; callIndex < functionCalls.length; callIndex++) {
-      const call = functionCalls[callIndex];
+    for (const element of functionCalls) {
+      const call = element;
       const name = call.name?.toString() ?? "";
       const args = (call.args ?? {}) as Record<string, unknown>;
       const thoughtSignature: string | undefined = (() => {
-        const direct =
-          (call as any)?.thought_signature ?? (call as any)?.thoughtSignature;
+        const direct = call?.thought_signature ?? call?.thoughtSignature;
         if (typeof direct === "string" && direct) return direct;
-        const id = (call as any)?.id;
+        const id = call?.id;
         if (typeof id === "string" && signatureById.has(id)) {
           return signatureById.get(id);
         }
@@ -295,14 +294,10 @@ export async function runToolLoop(
 
       const handler = toolHandlers[name];
 
-      const { effectiveArgs, readFileMeta } = normalizeToolArgs(
-        name,
-        args,
-        {
-          readFileDefaultMaxLines: policy.readFileDefaultMaxLines,
-          styleTokenKeySet,
-        }
-      );
+      const { effectiveArgs, readFileMeta } = normalizeToolArgs(name, args, {
+        readFileDefaultMaxLines: policy.readFileDefaultMaxLines,
+        styleTokenKeySet,
+      });
 
       logger(
         buildToolStatusMessage(name, effectiveArgs, readFileMeta),
@@ -445,6 +440,7 @@ export async function runToolLoop(
           finalText: "",
           steps: step + 1,
           terminalCall: { name, args: effectiveArgs, response: toolResultRaw },
+          success: true,
         };
       }
     }
@@ -461,5 +457,6 @@ export async function runToolLoop(
     modelContents,
     finalText: `Stopped: max steps reached (${maxSteps}).`,
     steps: maxSteps,
+    success: false,
   };
 }

@@ -1,9 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { BuilderElement } from "../../../types/elements.js";
+import type { CoreFs } from "../implementations/workspaceDeps.js";
 import { createElementId } from "./elementid.helpers.js";
 import { toWorkspacePath } from "./fileSystem.helpers.js";
-import type { CoreFs } from "../implementations/workspaceDeps.js";
 
 export type PageConfigJson = {
   elements: BuilderElement[];
@@ -205,11 +205,13 @@ export const writeFileAtomic = async (filePath: string, content: string) => {
 export const getAvailableRoutes = async (deps: {
   workspaceRoot: string;
   fs: {
-    safeReadDir: (absoluteDir: string) => Promise<Array<{
-      name: string;
-      isDirectory: () => boolean;
-      isFile: () => boolean;
-    }>>;
+    safeReadDir: (absoluteDir: string) => Promise<
+      Array<{
+        name: string;
+        isDirectory: () => boolean;
+        isFile: () => boolean;
+      }>
+    >;
   };
 }): Promise<string[]> => {
   const { workspaceRoot, fs } = deps;
@@ -239,7 +241,11 @@ export const getAvailableRoutes = async (deps: {
     }
 
     for (const entry of entries) {
-      if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
+      if (
+        entry.isDirectory() &&
+        entry.name !== "node_modules" &&
+        !entry.name.startsWith(".")
+      ) {
         await scan(path.join(dirPath, entry.name));
       }
     }
@@ -258,7 +264,10 @@ const isDynamic = (segment: string): boolean =>
 const isOptionalCatchAll = (segment: string): boolean =>
   segment.startsWith("[[") && segment.endsWith("]]") && segment.includes("...");
 
-export const matchRoute = (physicalRoute: string, requestedRoute: string): boolean => {
+export const matchRoute = (
+  physicalRoute: string,
+  requestedRoute: string,
+): boolean => {
   const physSegs = normalizeRouteSegments(physicalRoute);
   const reqSegs = normalizeRouteSegments(requestedRoute);
 
@@ -337,7 +346,8 @@ export const loadAndPreparePageConfig = async (
     before = await fs.readFile(configPath);
   } catch (err) {
     const code = (err as NodeJS.ErrnoException | null)?.code;
-    if (code === "ENOENT") return { success: false as const, error: "not found" };
+    if (code === "ENOENT")
+      return { success: false as const, error: "not found" };
     return {
       success: false as const,
       error: err instanceof Error ? err.message : String(err),
@@ -365,5 +375,3 @@ export const loadAndPreparePageConfig = async (
     existingIds,
   };
 };
-
-

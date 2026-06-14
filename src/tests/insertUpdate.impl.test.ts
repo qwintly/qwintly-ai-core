@@ -58,7 +58,7 @@ test("insert/update tools: inject ids, insert under parent, update props and cla
     const updateClassName = createUpdateClassNameImpl(deps);
 
     const inserted = await insert("/a", "root", [
-      { id: "new_el", parentId: "parent", type: "text", props: { text: "hello" } }
+      { id: "new_el", parentId: "root", type: "text", props: { text: "hello" } }
     ] as any);
     assert.equal(
       (inserted as any).success,
@@ -73,7 +73,7 @@ test("insert/update tools: inject ids, insert under parent, update props and cla
       parent_id: "root",
       before_id: "existing",
       elements: [
-        { id: "first_el", parentId: "parent", type: "text", props: { text: "first" } }
+        { id: "first_el", parentId: "root", type: "text", props: { text: "first" } }
       ],
     } as any);
     assert.equal(
@@ -189,7 +189,7 @@ test("dynamic/nested routes resolution in tools", async () => {
     const deleteElement = createDeleteElementImpl(deps);
 
     const insRes = await insert("/product/123", "root", [
-      { id: "buy_btn", parentId: "parent", type: "button", props: { text: "Buy Now" } }
+      { id: "buy_btn", parentId: "root", type: "button", props: { text: "Buy Now" } }
     ] as any);
     assert.equal(insRes.success, true);
 
@@ -263,7 +263,7 @@ test("insert tool: supports flat elements list with parent-child mapping", async
       elements: [
         {
           id: "container",
-          parentId: "parent",
+          parentId: "root",
           type: "div",
           className: "bg-red-500",
         },
@@ -338,13 +338,13 @@ test("insert tool: supports multiple sibling root elements in flat array", async
       elements: [
         {
           id: "card_1",
-          parentId: "parent",
+          parentId: "root",
           type: "div",
           className: "card-1",
         },
         {
           id: "card_2",
-          parentId: "parent",
+          parentId: "root",
           type: "div",
           className: "card-2",
         },
@@ -379,3 +379,99 @@ test("insert tool: supports multiple sibling root elements in flat array", async
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
+
+test("insert tool: handles inserting into an empty page config elements array", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-empty-page-"));
+  try {
+    const routeDir = path.join(workspaceRoot, "app", "empty-test");
+    await fs.mkdir(routeDir, { recursive: true });
+    const filePath = path.join(routeDir, "pageConfig.json");
+    await fs.writeFile(
+      filePath,
+      JSON.stringify(
+        {
+          elements: [],
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf-8",
+    );
+
+    const deps = { workspaceRoot, fs: makeRealFs() } as any;
+    const insert = createInsertElementImpl(deps);
+
+    const inserted = await insert({
+      route: "/empty-test",
+      parent_id: "root",
+      elements: [
+        {
+          id: "root",
+          parentId: "root",
+          type: "div",
+          className: "bg-blue-500",
+        },
+      ],
+    } as any);
+
+    assert.equal((inserted as any).success, true, `unexpected response: ${JSON.stringify(inserted)}`);
+    const after = JSON.parse(await fs.readFile(filePath, "utf-8"));
+    assert.equal(after.elements.length, 1);
+    assert.equal(after.elements[0].className, "bg-blue-500");
+    assert.ok(after.elements[0].id.startsWith("el_"));
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("insert tool: supports parentId set to the parent_id parameter", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-tolerant-"));
+  try {
+    const routeDir = path.join(workspaceRoot, "app", "tolerant-test");
+    await fs.mkdir(routeDir, { recursive: true });
+    const filePath = path.join(routeDir, "pageConfig.json");
+    await fs.writeFile(
+      filePath,
+      JSON.stringify(
+        {
+          elements: [
+            {
+              id: "root_element",
+              type: "div",
+              children: [],
+            },
+          ],
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf-8",
+    );
+
+    const deps = { workspaceRoot, fs: makeRealFs() } as any;
+    const insert = createInsertElementImpl(deps);
+
+    const inserted = await insert({
+      route: "/tolerant-test",
+      parent_id: "root_element",
+      elements: [
+        {
+          id: "child_element",
+          parentId: "root_element", // uses 'root_element' instead of 'parent'
+          type: "text",
+          props: { text: "Hello" },
+        },
+      ],
+    } as any);
+
+    assert.equal((inserted as any).success, true, `unexpected response: ${JSON.stringify(inserted)}`);
+    const after = JSON.parse(await fs.readFile(filePath, "utf-8"));
+    const rootEl = after.elements[0];
+    assert.equal(rootEl.children.length, 1);
+    assert.equal(rootEl.children[0].props.text, "Hello");
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+

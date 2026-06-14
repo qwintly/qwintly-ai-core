@@ -22,7 +22,7 @@ export class StatusServiceError extends Error {
 }
 
 export const assertNonEmpty = (value: string, field: string): void => {
-  if (!value || !value.trim()) {
+  if (!value?.trim()) {
     throw new StatusServiceError(
       "INVALID_ARGUMENTS",
       `\`${field}\` must be a non-empty string`,

@@ -108,7 +108,12 @@ const buildUpdateClassnameStatus: StatusMessageBuilder = ({ name, effectiveArgs 
   if (name !== "update_classname") return null;
   const route = typeof effectiveArgs.route === "string" ? effectiveArgs.route : "";
   const id = typeof effectiveArgs.element_id === "string" ? effectiveArgs.element_id : "";
-  const className = typeof effectiveArgs.class_name === "string" ? effectiveArgs.class_name : "";
+  const className =
+    typeof effectiveArgs.className === "string"
+      ? effectiveArgs.className
+      : typeof effectiveArgs.class_name === "string"
+      ? effectiveArgs.class_name
+      : "";
   const classNameStr = className ? ` to "${className}"` : "";
   return `AI tool: Updating class name for element "${id}" on route "${route}"${classNameStr}`;
 };

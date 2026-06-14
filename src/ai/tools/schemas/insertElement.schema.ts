@@ -16,7 +16,7 @@ export const ELEMENT_TYPES = [
 export const InsertElementSchema = {
   name: "insert_element",
   description:
-    "Inserts a tree of UI elements represented as a flat array of elements. One or more elements can have parentId set to 'parent' to be the roots (siblings inserted at the same level). Subsequent children point to their parent using temporary ID references (e.g., parentId set to parent's temporary id).",
+    "Inserts a tree of UI elements represented as a flat array of elements. One or more elements must have parentId set to match the target parent_id parameter to be the roots of the inserted subtree. Subsequent children point to their parent using temporary ID references (e.g., parentId set to parent's temporary id).",
   parameters: {
     type: Type.OBJECT,
     properties: {
@@ -38,7 +38,7 @@ export const InsertElementSchema = {
       elements: {
         type: Type.ARRAY,
         description:
-          "Flat array of elements that form a tree. One or more elements can have parentId set to 'parent' to attach directly under the parent_id as siblings. Subsequent child elements should have parentId matching the temporary id of their parent in this array.",
+          "Flat array of elements that form a tree. One or more elements must have parentId matching the parent_id parameter to attach directly under the parent_id as siblings. Subsequent child elements should have parentId matching the temporary id of their parent in this array.",
         items: {
           type: Type.OBJECT,
           properties: {
@@ -48,7 +48,7 @@ export const InsertElementSchema = {
             },
             parentId: {
               type: Type.STRING,
-              description: "The temporary ID of the parent element in this list, or 'parent' to insert directly under the page's parent_id.",
+              description: "The temporary ID of the parent element in this list, or matching parent_id to insert directly under the page's parent_id.",
             },
             type: {
               type: Type.STRING,

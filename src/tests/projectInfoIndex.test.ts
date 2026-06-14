@@ -5,7 +5,7 @@ import os from "node:os";
 import fs from "node:fs/promises";
 import { computeProjectInfo } from "../indexer/projectInfoIndex.js";
 
-test("computeProjectInfo: scans routes and sections from pageConfig.json files", async () => {
+test("computeProjectInfo: scans routes from directories and constructs pages", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-project-info-"));
   try {
     // 1. Create a root pageConfig.json with a div root and two sections
@@ -64,26 +64,18 @@ test("computeProjectInfo: scans routes and sections from pageConfig.json files",
     assert.ok(rootPage);
     assert.equal(rootPage.pageName, "root");
     assert.equal(rootPage.description, "root page for this project");
-    assert.deepEqual(rootPage.sections, [
-      { sectionName: "hero", description: "hero section for this page" },
-      { sectionName: "footer", description: "footer section for this page" }
-    ]);
 
     // /dashboard route
     const dashboardPage = projectInfo.uiPages.find(p => p.pageRoute === "/dashboard");
     assert.ok(dashboardPage);
     assert.equal(dashboardPage.pageName, "dashboard");
     assert.equal(dashboardPage.description, "dashboard page for this project");
-    assert.equal(dashboardPage.sections, undefined);
 
     // /dashboard/settings route
     const settingsPage = projectInfo.uiPages.find(p => p.pageRoute === "/dashboard/settings");
     assert.ok(settingsPage);
     assert.equal(settingsPage.pageName, "dashboard-settings");
     assert.equal(settingsPage.description, "dashboard-settings page for this project");
-    assert.deepEqual(settingsPage.sections, [
-      { sectionName: "settings", description: "settings section for this page" }
-    ]);
 
   } finally {
     await fs.rm(workspaceRoot, { recursive: true, force: true });

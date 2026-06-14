@@ -26,7 +26,7 @@ test("tool loop: insert_element failure includes available routes and hint", asy
                 route: "/invalid-route",
                 parent_id: "root",
                 elements: [
-                  { id: "text_el", parentId: "parent", type: "text", props: { text: "hi" } }
+                  { id: "text_el", parentId: "root", type: "text", props: { text: "hi" } }
                 ],
               },
             },
@@ -116,6 +116,158 @@ test("tool loop: get_available_routes retrieves routes", async () => {
 
     assert.equal(response?.success, true);
     assert.deepEqual(response?.routes, ["/", "/dashboard"]);
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("tool loop: update_classname updates element's className using className parameter", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-runner-"));
+  try {
+    await fs.mkdir(path.join(workspaceRoot, "app"), { recursive: true });
+    const configPath = path.join(workspaceRoot, "app", "pageConfig.json");
+    await fs.writeFile(
+      configPath,
+      JSON.stringify({
+        elements: [
+          {
+            id: "el_mGCUHuZuL0",
+            type: "button",
+            props: { text: "Order Now" },
+            children: [],
+            className: "",
+          },
+        ],
+      })
+    );
+
+    let aiCalls = 0;
+    const aiCall = async () => {
+      aiCalls += 1;
+      if (aiCalls === 1) {
+        return {
+          functionCalls: [
+            {
+              name: "update_classname",
+              args: {
+                route: "/",
+                element_id: "el_mGCUHuZuL0",
+                className: "bg-red-600 font-bold",
+              },
+            },
+          ],
+        };
+      }
+      return { functionCalls: [], text: "ok" };
+    };
+
+    const res = await runToolLoop({
+      initialContents: [],
+      tools: [],
+      workspaceRoot,
+      aiCall,
+      logger: async () => {},
+      toolCallingMode: FunctionCallingConfigMode.ANY,
+      maxSteps: 5,
+      keepFullTrace: false,
+    });
+
+    assert.equal(res.finalText, "ok");
+
+    const toolResponses = res.modelContents.filter(
+      (c: any) =>
+        c?.role === "user" &&
+        Array.isArray(c?.parts) &&
+        c.parts.some((p: any) => p?.functionResponse?.name === "update_classname"),
+    );
+    assert.equal(toolResponses.length, 1);
+
+    const response = toolResponses[0].parts.find(
+      (p: any) => p?.functionResponse?.name === "update_classname",
+    )?.functionResponse?.response;
+
+    assert.equal(response?.success, true);
+    assert.equal(response?.updated_id, "el_mGCUHuZuL0");
+
+    const afterConfig = JSON.parse(await fs.readFile(configPath, "utf-8"));
+    assert.equal(afterConfig.elements[0].className, "bg-red-600 font-bold");
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});
+
+test("tool loop: update_props updates element's props using root-level parameters", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-runner-"));
+  try {
+    await fs.mkdir(path.join(workspaceRoot, "app"), { recursive: true });
+    const configPath = path.join(workspaceRoot, "app", "pageConfig.json");
+    await fs.writeFile(
+      configPath,
+      JSON.stringify({
+        elements: [
+          {
+            id: "el_k01Ij3HJvZ",
+            type: "text",
+            props: {
+              text: "A vibrant blast of sweet, sun-ripened strawberries.",
+            },
+            children: [],
+            className: "text-sm text-muted-foreground",
+          },
+        ],
+      })
+    );
+
+    let aiCalls = 0;
+    const aiCall = async () => {
+      aiCalls += 1;
+      if (aiCalls === 1) {
+        return {
+          functionCalls: [
+            {
+              name: "update_props",
+              args: {
+                route: "/",
+                element_id: "el_k01Ij3HJvZ",
+                text: "Life is too short for boring flavors! This is pure strawberry joy.",
+              },
+            },
+          ],
+        };
+      }
+      return { functionCalls: [], text: "ok" };
+    };
+
+    const res = await runToolLoop({
+      initialContents: [],
+      tools: [],
+      workspaceRoot,
+      aiCall,
+      logger: async () => {},
+      toolCallingMode: FunctionCallingConfigMode.ANY,
+      maxSteps: 5,
+      keepFullTrace: false,
+    });
+
+    assert.equal(res.finalText, "ok");
+
+    const toolResponses = res.modelContents.filter(
+      (c: any) =>
+        c?.role === "user" &&
+        Array.isArray(c?.parts) &&
+        c.parts.some((p: any) => p?.functionResponse?.name === "update_props"),
+    );
+    assert.equal(toolResponses.length, 1);
+
+    const response = toolResponses[0].parts.find(
+      (p: any) => p?.functionResponse?.name === "update_props",
+    )?.functionResponse?.response;
+
+    assert.equal(response?.success, true);
+    assert.equal(response?.updated_id, "el_k01Ij3HJvZ");
+
+    const afterConfig = JSON.parse(await fs.readFile(configPath, "utf-8"));
+    assert.equal(afterConfig.elements[0].props.text, "Life is too short for boring flavors! This is pure strawberry joy.");
   } finally {
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }

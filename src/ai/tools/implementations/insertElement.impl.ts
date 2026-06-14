@@ -10,10 +10,10 @@ import {
 import { InsertElementArgsZod } from "../validators/builderElement.zod.js";
 import { type WorkspaceDeps } from "./workspaceDeps.js";
 
-function reconstructTree(flatElements: any[]): BuilderElement[] {
-  const rootFlats = flatElements.filter((el) => el.parentId === "parent");
+function reconstructTree(flatElements: any[], parentId: string): BuilderElement[] {
+  const rootFlats = flatElements.filter((el) => el.parentId === parentId);
   if (rootFlats.length === 0) {
-    throw new Error("No root element found with parentId 'parent'");
+    throw new Error(`No root element found with parentId '${parentId}'`);
   }
 
   const buildMap = new Map<string, any>();
@@ -28,13 +28,13 @@ function reconstructTree(flatElements: any[]): BuilderElement[] {
   }
 
   for (const flat of flatElements) {
-    if (flat.parentId === "parent") {
+    if (flat.parentId === parentId) {
       continue;
     }
     const parentNode = buildMap.get(flat.parentId);
     if (!parentNode) {
       throw new Error(
-        `Parent element with id '${flat.parentId}' not found in the list`,
+        `Parent element with id '${flat.parentId}' not found in the list. Please read the file using read_file tool to see the valid parent ids available. DO NOT do insert with same args without calling read_file tool.`,
       );
     }
     const currentNode = buildMap.get(flat.id);
@@ -60,7 +60,7 @@ export const createInsertElementImpl = (deps: WorkspaceDeps) => {
   ) => {
     const rawArgs =
       typeof routeOrArgs === "object" && routeOrArgs !== null
-        ? (routeOrArgs as Record<string, unknown>)
+        ? (routeOrArgs)
         : {
             route: routeOrArgs,
             parent_id: parentId,
@@ -90,7 +90,7 @@ export const createInsertElementImpl = (deps: WorkspaceDeps) => {
     // Clone + inject ids for the inserted element subtree.
     let toInsert: BuilderElement[];
     try {
-      toInsert = reconstructTree(parsedArgs.data.elements);
+      toInsert = reconstructTree(parsedArgs.data.elements, parent_id);
     } catch (err) {
       return {
         success: false,
@@ -103,19 +103,23 @@ export const createInsertElementImpl = (deps: WorkspaceDeps) => {
     }
     ensureElementIds(toInsert, existingIds);
 
-    const parent = findElementById(elements, parent_id);
-    if (!parent) return { success: false, error: "parent not found" };
-
-    const anyParent = parent as any;
-    if (!anyParent.children || !Array.isArray(anyParent.children))
-      anyParent.children = [];
-
-    const children = anyParent.children as BuilderElement[];
-    const idx = before_id ? children.findIndex((c: any) => String(c?.id ?? "") === before_id) : -1;
-    if (idx >= 0) {
-      children.splice(idx, 0, ...toInsert);
+    if (elements.length === 0) {
+      elements.push(...toInsert);
     } else {
-      children.push(...toInsert);
+      const parent = findElementById(elements, parent_id);
+      if (!parent) return { success: false, error: "parent not found" };
+
+      const anyParent = parent as any;
+      if (!anyParent.children || !Array.isArray(anyParent.children))
+        anyParent.children = [];
+
+      const children = anyParent.children as BuilderElement[];
+      const idx = before_id ? children.findIndex((c: any) => String(c?.id ?? "") === before_id) : -1;
+      if (idx >= 0) {
+        children.splice(idx, 0, ...toInsert);
+      } else {
+        children.push(...toInsert);
+      }
     }
 
     const after = stringifyPageConfigJson({ elements });

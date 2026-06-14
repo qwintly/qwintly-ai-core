@@ -18,6 +18,11 @@ export const createDeleteElementImpl = (deps: WorkspaceDeps) => {
 
     const { configPath, elements } = prep;
 
+    const isRoot = elements.some((el) => el?.id === id);
+    if (isRoot) {
+      return { success: false, error: "Cannot delete the root element" };
+    }
+
     const deleted = deleteElementById(elements, id);
     if (!deleted) return { success: true, changed: false };
 
