@@ -1,12 +1,13 @@
 const examples = [
   `## Examples of tool calls
 
-  ### Example: \`insert_element\` (add a CTA section)
+  ### Example: \`modify_element\` (action='insert' to add a CTA section)
   Goal: Insert a new section under the page root on route \`/\`.
 
 Tool call:
 \`\`\`json
 {
+  "action": "insert",
   "route": "/",
   "parent_id": "root",
   "before_id": "el_existing_sibling_id",
@@ -91,12 +92,13 @@ Notes:
 - Include at least 1 key/value; never call \`update_global_styles\` with \`{}\`.
 - Use safe, non-empty CSS strings (avoid \`<\`, \`>\`, or \`</style\`).`,
 
-  `### Example: \`update_classname\` (replace className fully)
+  `### Example: \`modify_element\` (action='update_classname' to replace className fully)
 Goal: Update styling on an existing element.
 
 Tool call:
 \`\`\`json
 {
+  "action": "update_classname",
   "route": "/",
   "element_id": "el_123abc",
   "className": "mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
@@ -106,12 +108,13 @@ Tool call:
 Notes:
 - Provide the full \`className\`; do not send partial patches.`,
 
-  `### Example: \`update_props\` (update element props)
+  `### Example: \`modify_element\` (action='update_props' to update element props)
 Goal: Update the text and click action for a button.
 
-Tool call (function name in tool schema is \`update_props\`):
+Tool call:
 \`\`\`json
 {
+  "action": "update_props",
   "route": "/",
   "element_id": "el_123abc",
   "text": "Start free trial",
@@ -122,6 +125,7 @@ Tool call (function name in tool schema is \`update_props\`):
 Other common prop updates:
 \`\`\`json
 {
+  "action": "update_props",
   "route": "/",
   "element_id": "el_img_001",
   "alt": "A person collaborating on a laptop in a bright office"

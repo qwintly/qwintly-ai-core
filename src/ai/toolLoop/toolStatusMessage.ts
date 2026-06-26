@@ -1,5 +1,3 @@
-import { getApplyPatchEventMeta } from "./helpers/applyPatch.helper.js";
-
 type StatusMessageInput = {
   name: string;
   effectiveArgs: Record<string, unknown>;
@@ -30,24 +28,6 @@ const buildReadFileStatus: StatusMessageBuilder = ({
       : Number(effectiveArgs.end_line);
   const lines = end === undefined ? `starting at line ${start}` : `lines ${start}-${end}`;
   return `AI tool: Reading file "${path}" (${lines})`;
-};
-
-const buildWriteFileStatus: StatusMessageBuilder = ({ name, effectiveArgs }) => {
-  if (name !== "write_file") return null;
-  const path = typeof effectiveArgs.path === "string" ? effectiveArgs.path : "";
-  return `AI tool: Writing file "${path}"`;
-};
-
-const buildApplyPatchStatus: StatusMessageBuilder = ({ name, effectiveArgs }) => {
-  if (name !== "apply_patch") return null;
-
-  const meta = getApplyPatchEventMeta(effectiveArgs);
-  const files = Array.isArray(meta.files) ? meta.files : [];
-  if (files.length === 0) return "AI tool: Applying patch";
-  if (files.length <= 3) return `AI tool: Applying changes to "${files.join(", ")}"`;
-  return `AI tool: Applying changes to ${files.length} files: "${files
-    .slice(0, 3)
-    .join(", ")}" (+${files.length - 3} more)`;
 };
 
 const buildSearchStatus: StatusMessageBuilder = ({ name, effectiveArgs }) => {
@@ -81,41 +61,36 @@ const buildCreateNewRouteStatus: StatusMessageBuilder = ({ name, effectiveArgs }
   return `AI tool: Creating new route "${route}" (parent: "${parent}")`;
 };
 
-const buildDeleteElementStatus: StatusMessageBuilder = ({ name, effectiveArgs }) => {
-  if (name !== "delete_element") return null;
+const buildModifyElementStatus: StatusMessageBuilder = ({ name, effectiveArgs }) => {
+  if (name !== "modify_element") return null;
+  const action = typeof effectiveArgs.action === "string" ? effectiveArgs.action : "";
   const route = typeof effectiveArgs.route === "string" ? effectiveArgs.route : "";
-  const id = typeof effectiveArgs.element_id === "string" ? effectiveArgs.element_id : "";
-  return `AI tool: Deleting element "${id}" from route "${route}"`;
-};
 
-const buildInsertElementStatus: StatusMessageBuilder = ({ name, effectiveArgs }) => {
-  if (name !== "insert_element") return null;
-  const route = typeof effectiveArgs.route === "string" ? effectiveArgs.route : "";
-  const parent = typeof effectiveArgs.parent_id === "string" ? effectiveArgs.parent_id : "";
-  const before = typeof effectiveArgs.before_id === "string" ? effectiveArgs.before_id : "";
-  const beforeStr = before ? `, before "${before}"` : "";
-  return `AI tool: Inserting element into route "${route}" (under parent "${parent}"${beforeStr})`;
-};
+  if (action === "insert") {
+    const parent = typeof effectiveArgs.parent_id === "string" ? effectiveArgs.parent_id : "";
+    const before = typeof effectiveArgs.before_id === "string" ? effectiveArgs.before_id : "";
+    const beforeStr = before ? `, before "${before}"` : "";
+    return `AI tool: Inserting element into route "${route}" (under parent "${parent}"${beforeStr})`;
+  }
 
-const buildUpdatePropsStatus: StatusMessageBuilder = ({ name, effectiveArgs }) => {
-  if (name !== "update_props") return null;
-  const route = typeof effectiveArgs.route === "string" ? effectiveArgs.route : "";
-  const id = typeof effectiveArgs.element_id === "string" ? effectiveArgs.element_id : "";
-  return `AI tool: Updating properties for element "${id}" on route "${route}"`;
-};
+  if (action === "delete") {
+    const id = typeof effectiveArgs.element_id === "string" ? effectiveArgs.element_id : "";
+    return `AI tool: Deleting element "${id}" from route "${route}"`;
+  }
 
-const buildUpdateClassnameStatus: StatusMessageBuilder = ({ name, effectiveArgs }) => {
-  if (name !== "update_classname") return null;
-  const route = typeof effectiveArgs.route === "string" ? effectiveArgs.route : "";
-  const id = typeof effectiveArgs.element_id === "string" ? effectiveArgs.element_id : "";
-  const className =
-    typeof effectiveArgs.className === "string"
-      ? effectiveArgs.className
-      : typeof effectiveArgs.class_name === "string"
-      ? effectiveArgs.class_name
-      : "";
-  const classNameStr = className ? ` to "${className}"` : "";
-  return `AI tool: Updating class name for element "${id}" on route "${route}"${classNameStr}`;
+  if (action === "update_classname") {
+    const id = typeof effectiveArgs.element_id === "string" ? effectiveArgs.element_id : "";
+    const className = typeof effectiveArgs.className === "string" ? effectiveArgs.className : "";
+    const classNameStr = className ? ` to "${className}"` : "";
+    return `AI tool: Updating class name for element "${id}" on route "${route}"${classNameStr}`;
+  }
+
+  if (action === "update_props") {
+    const id = typeof effectiveArgs.element_id === "string" ? effectiveArgs.element_id : "";
+    return `AI tool: Updating properties for element "${id}" on route "${route}"`;
+  }
+
+  return `AI tool: Modifying element on route "${route}" (action: ${action})`;
 };
 
 const buildGetAvailableRoutesStatus: StatusMessageBuilder = ({ name }) => {
@@ -138,16 +113,11 @@ const buildSubmitCodegenDoneStatus: StatusMessageBuilder = ({ name, effectiveArg
 
 const BUILDERS: StatusMessageBuilder[] = [
   buildReadFileStatus,
-  buildWriteFileStatus,
-  buildApplyPatchStatus,
   buildSearchStatus,
   buildListDirStatus,
   buildUpdateGlobalStylesStatus,
   buildCreateNewRouteStatus,
-  buildDeleteElementStatus,
-  buildInsertElementStatus,
-  buildUpdatePropsStatus,
-  buildUpdateClassnameStatus,
+  buildModifyElementStatus,
   buildGetAvailableRoutesStatus,
   buildSubmitPlannerTasksStatus,
   buildSubmitCodegenDoneStatus,
@@ -165,4 +135,3 @@ export const buildToolStatusMessage = (
   }
   return `AI tool: ${name}`;
 };
-

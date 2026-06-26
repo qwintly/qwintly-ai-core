@@ -17,8 +17,6 @@ export function createToolHandlers(params: {
       const content = await params.impls.readFileImpl(path, startLine, endLine);
       return { path, content };
     },
-    write_file: (args) =>
-      params.impls.writeFileImpl(String(args.path ?? ""), String(args.content ?? "")),
     list_dir: async (args) => {
       const content = await params.impls.listDirImpl(
         String(args.path ?? ""),
@@ -30,8 +28,6 @@ export function createToolHandlers(params: {
       const results = await params.impls.searchImpl(String(args.search_query ?? ""));
       return { results };
     },
-    apply_patch: (args) =>
-      params.impls.applyPatchImpl(String(args.patch_string ?? "")),
     update_global_styles: async (args) => {
       const result = await params.impls.updateGlobalStylesImpl(args);
       return result;
@@ -42,51 +38,19 @@ export function createToolHandlers(params: {
       const result = await params.impls.createNewRouteImpl(parentRoute, routeName);
       return result;
     },
-    delete_element: async (args) => {
-      const route = String(args.route ?? "");
-      const element_id = String(args.element_id ?? "");
-      const result = await params.impls.deleteElementImpl(route, element_id);
-      return result;
-    },
-    insert_element: async (args) => {
-      const result = await params.impls.insertElementImpl(args);
-      if (!result.success) {
+    modify_element: async (args) => {
+      const result = await params.impls.modifyElementImpl(args);
+      if (!result.success && args.action === "insert") {
         const available = await getAvailableRoutes({
           workspaceRoot: params.workspaceRoot,
           fs: nodeFs,
         });
         return {
           success: false,
-          error: `insert_element failed: ${result.error}. Available routes are: ${JSON.stringify(available)}. If you intend to create a new route, create it using the 'create_new_route' tool.`,
+          error: `modify_element (insert) failed: ${result.error}. Available routes are: ${JSON.stringify(available)}. If you intend to create a new route, create it using the 'create_new_route' tool.`,
           available_routes: available,
         };
       }
-      return result;
-    },
-    update_props: async (args) => {
-      const { route, element_id, props, ...rest } = args;
-      const routeStr = String(route ?? "");
-      const elementIdStr = String(element_id ?? "");
-      const mergedProps = {
-        ...(typeof props === "object" && props !== null ? props : {}),
-        ...rest,
-      };
-      const result = await params.impls.updatePropsImpl({
-        route: routeStr,
-        element_id: elementIdStr,
-        ...mergedProps,
-      });
-      return result;
-    },
-    update_classname: async (args) => {
-      const route = String(args.route ?? "");
-      const element_id = String(args.element_id ?? "");
-      const class_name = String(args.className ?? args.class_name ?? "");
-      const result = await params.impls.updateClassNameImpl(
-        route,
-        element_id,
-        class_name,
-      );
       return result;
     },
     get_available_routes: async (args) => {

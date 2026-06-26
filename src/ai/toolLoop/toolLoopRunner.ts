@@ -7,7 +7,6 @@ import { createWorkspaceToolImpls } from "../tools/implementations/factories.js"
 import { aiCallWithRetry } from "./helpers/aiCall.helper.js";
 import { serializeError } from "./helpers/errors.helper.js";
 import { nodeFs } from "./helpers/fsHelpers.js";
-import { handleApplyPatchFailure } from "./helpers/patchRetry.helper.js";
 import {
   extractUsageTokenCounts,
   persistTokensOnce,
@@ -23,7 +22,6 @@ import { recordToolEvent } from "./toolEventSummary.js";
 import {
   compactForModel,
   DEFAULT_CONTEXT_POLICY,
-  redactFunctionCallArgs,
   ToolEvent,
   ToolLoopContextPolicy,
 } from "./toolLoopContext.js";
@@ -79,7 +77,6 @@ export type RunToolLoopOptions = {
   contextPolicy?: ToolLoopContextPolicy;
   aiCall: AiCallFn;
   logger: Logger;
-  applyPatchAutoRetryMax?: number;
   aiCallAutoRetryMax?: number;
   aiCallAutoRetryBaseMs?: number;
   aiCallAutoRetryMaxMs?: number;
@@ -103,7 +100,6 @@ export async function runToolLoop(
     contextPolicy,
     aiCall,
     logger,
-    applyPatchAutoRetryMax = 2,
     aiCallAutoRetryMax = 3, // must have it to try 3 times as gemini errors a lot due to high demand sometimes
     aiCallAutoRetryBaseMs = 400,
     aiCallAutoRetryMaxMs = 10_000,
@@ -135,7 +131,6 @@ export async function runToolLoop(
   };
 
   const toolEvents: ToolEvent[] = [];
-  let applyPatchRetryCount = 0;
 
   const EXECUTION_GUIDE_MARKER = "TOOL_LOOP_EXECUTION_GUIDE_V1";
   const executionGuideInstruction = {
@@ -305,7 +300,7 @@ export async function runToolLoop(
         true,
       );
 
-      const modelArgs = redactFunctionCallArgs(name, effectiveArgs);
+      const modelArgs = effectiveArgs;
 
       const functionCallPart = {
         functionCall: {
@@ -400,22 +395,6 @@ export async function runToolLoop(
       }
       modelContents.push(responseFull);
 
-      if (
-        name === "apply_patch" &&
-        (toolResult as any)?.success === false &&
-        applyPatchAutoRetryMax > 0 &&
-        applyPatchRetryCount < applyPatchAutoRetryMax
-      ) {
-        const failureResult = handleApplyPatchFailure({
-          toolResult,
-          applyPatchAutoRetryMax,
-          applyPatchRetryCount,
-          keepFullTrace,
-          fullTraceContents,
-          modelContents,
-        });
-        applyPatchRetryCount = failureResult.applyPatchRetryCount;
-      }
 
       recordToolEvent({
         toolEvents,

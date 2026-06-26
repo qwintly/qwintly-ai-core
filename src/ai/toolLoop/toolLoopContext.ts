@@ -1,4 +1,3 @@
-import { extractPatchFiles, sha256Hex } from "./helpers/fsHelpers.js";
 
 export type ToolEvent = {
   name: string;
@@ -19,35 +18,6 @@ export const DEFAULT_CONTEXT_POLICY: Required<ToolLoopContextPolicy> = {
   logApproxModelChars: false,
 };
 
-export const redactFunctionCallArgs = (
-  name: string,
-  args: Record<string, unknown>,
-) => {
-  if (name !== "apply_patch") return args;
-
-  const patch = typeof args.patch_string === "string" ? args.patch_string : "";
-  if (!patch) {
-    return {
-      ...args,
-      patch_string: {
-        omitted: true,
-        chars: 0,
-        sha256: sha256Hex(""),
-        files: [],
-      },
-    };
-  }
-
-  return {
-    ...args,
-    patch_string: {
-      omitted: true,
-      chars: patch.length,
-      sha256: sha256Hex(patch),
-      files: extractPatchFiles(patch),
-    },
-  };
-};
 
 const isMemoryMessage = (item: any) => {
   const text = item?.parts?.[0]?.text;

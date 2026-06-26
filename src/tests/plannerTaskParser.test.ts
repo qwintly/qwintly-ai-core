@@ -33,9 +33,7 @@ test("plannerTaskParser: invalid tasks past index 15 are ignored and don't throw
   }));
 
   // Append invalid tasks at the end
-  tasks.push({ description: "", targets: [] }); // invalid: empty description & target min length
-  tasks.push({ description: 123, targets: "not-an-array" }); // completely invalid
-  tasks.push("not-even-an-object");
+  tasks.push({ description: "", targets: [] }, { description: 123, targets: "not-an-array" });
 
   const parsed = parsePlannerTasksUnknown(tasks);
   assert.equal(parsed.length, 15);

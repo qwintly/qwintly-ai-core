@@ -81,18 +81,50 @@ export const FlatBuilderElementZod = z.object({
   props: BuilderElementPropsZod.optional(),
 });
 
-export const InsertElementArgsZod = z.object({
-  route: z.preprocess(
-    normalizeInternalRoutePath,
-    z
-      .string()
-      .min(1)
-      .refine(isInternalRoutePath, {
-        message:
-          "route must be like '/' or '/about' (forward slashes only; no backslashes)",
+export const ModifyElementArgsZod = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("insert"),
+    route: z.preprocess(
+      normalizeInternalRoutePath,
+      z.string().min(1).refine(isInternalRoutePath, {
+        message: "route must be like '/' or '/about' (forward slashes only; no backslashes)",
       }),
-  ),
-  parent_id: z.string().min(1),
-  before_id: z.string().min(1).optional(),
-  elements: z.array(FlatBuilderElementZod).min(1),
-});
+    ),
+    parent_id: z.string().min(1),
+    before_id: z.string().min(1).optional(),
+    elements: z.array(FlatBuilderElementZod).min(1),
+  }),
+  z.object({
+    action: z.literal("delete"),
+    route: z.preprocess(
+      normalizeInternalRoutePath,
+      z.string().min(1).refine(isInternalRoutePath, {
+        message: "route must be like '/' or '/about' (forward slashes only; no backslashes)",
+      }),
+    ),
+    element_id: z.string().min(1),
+  }),
+  z.object({
+    action: z.literal("update_classname"),
+    route: z.preprocess(
+      normalizeInternalRoutePath,
+      z.string().min(1).refine(isInternalRoutePath, {
+        message: "route must be like '/' or '/about' (forward slashes only; no backslashes)",
+      }),
+    ),
+    element_id: z.string().min(1),
+    className: z.string(),
+  }),
+  z.object({
+    action: z.literal("update_props"),
+    route: z.preprocess(
+      normalizeInternalRoutePath,
+      z.string().min(1).refine(isInternalRoutePath, {
+        message: "route must be like '/' or '/about' (forward slashes only; no backslashes)",
+      }),
+    ),
+    element_id: z.string().min(1),
+    props: BuilderElementPropsZod.optional(),
+  }).passthrough(),
+]);
+

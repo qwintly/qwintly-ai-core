@@ -1,5 +1,4 @@
 import { STYLE_TOKEN_KEYS } from "../../types/styleConfig.js";
-import { getApplyPatchEventMeta } from "./helpers/applyPatch.helper.js";
 import { ToolEvent } from "./toolLoopContext.js";
 
 export type ToolEventSummaryInput = {
@@ -49,31 +48,6 @@ const summarizeReadFile: ToolEventSummarizer = (input) => {
   };
 };
 
-const summarizeApplyPatch: ToolEventSummarizer = (input) => {
-  if (input.name !== "apply_patch") return null;
-
-  const meta =
-    typeof (input.modelArgs as any).patch_string === "object"
-      ? ((input.modelArgs as any).patch_string as any)
-      : null;
-  const fallback = getApplyPatchEventMeta(input.effectiveArgs);
-  let ok = "done";
-  if ((input.toolResult as any)?.success === true) {
-    ok = "success";
-  } else if ((input.toolResult as any)?.success === false) {
-    ok = "failure";
-  }
-
-  return {
-    name: input.name,
-    summary: `apply_patch files=${JSON.stringify(
-      meta?.files ?? fallback.files,
-    )} sha256=${String(meta?.sha256 ?? fallback.sha256).slice(0, 12)} chars=${
-      meta?.chars ?? fallback.chars
-    } result=${ok}`,
-  };
-};
-
 const summarizeCreateNewRoute: ToolEventSummarizer = (input) => {
   if (input.name !== "create_new_route") return null;
 
@@ -101,90 +75,88 @@ const summarizeCreateNewRoute: ToolEventSummarizer = (input) => {
   };
 };
 
-const summarizeInsertElement: ToolEventSummarizer = (input) => {
-  if (input.name !== "insert_element") return null;
+const summarizeModifyElement: ToolEventSummarizer = (input) => {
+  if (input.name !== "modify_element") return null;
 
+  const action = getStringArg(input.effectiveArgs, "action");
   const route = getStringArg(input.effectiveArgs, "route");
-  const parentId = getStringArg(input.effectiveArgs, "parent_id");
-  const beforeId = getStringArg(input.effectiveArgs, "before_id");
   const successVal = (input.toolResult as any)?.success;
   if (typeof successVal !== "boolean") return null;
-
-  const insertedId = oneLine((input.toolResult as any)?.inserted_id ?? "");
-  const changedVal = (input.toolResult as any)?.changed;
-  const changedText =
-    typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
-  const beforeText = beforeId ? ` before_id=${beforeId}` : "";
-  const insertedText = insertedId ? ` inserted_id=${insertedId}` : "";
-  const errText =
-    successVal === false
-      ? ` error=${oneLine((input.toolResult as any)?.error ?? "unknown", 160)}`
-      : "";
-
-  return {
-    name: input.name,
-    summary: `insert_element ${successVal ? "success" : "failure"} route=${route} parent_id=${parentId}${beforeText}${insertedText}${changedText}${errText}`,
-  };
-};
-
-const summarizeUpdateClassname: ToolEventSummarizer = (input) => {
-  if (input.name !== "update_classname") return null;
-
-  const route = getStringArg(input.effectiveArgs, "route");
-  const elementId = getStringArg(input.effectiveArgs, "element_id");
-  const className = oneLine((input.effectiveArgs as any).className ?? "", 160);
-  const successVal = (input.toolResult as any)?.success;
-  if (typeof successVal !== "boolean") return null;
-
-  const changedVal = (input.toolResult as any)?.changed;
-  const changedText =
-    typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
-  const updatedId = oneLine((input.toolResult as any)?.updated_id ?? "");
-  const updatedText = updatedId ? ` updated_id=${updatedId}` : "";
-  const errText =
-    successVal === false
-      ? ` error=${oneLine((input.toolResult as any)?.error ?? "unknown", 160)}`
-      : "";
-
-  return {
-    name: input.name,
-    summary: `update_classname ${successVal ? "success" : "failure"} route=${route} element_id=${elementId} className="${className}"${updatedText}${changedText}${errText}`,
-  };
-};
-
-const summarizeUpdateProps: ToolEventSummarizer = (input) => {
-  if (input.name !== "update_props") return null;
-
-  const route = getStringArg(input.effectiveArgs, "route");
-  const elementId = getStringArg(input.effectiveArgs, "element_id");
-  const successVal = (input.toolResult as any)?.success;
-  if (typeof successVal !== "boolean") return null;
-
-  const changedVal = (input.toolResult as any)?.changed;
-  const changedText =
-    typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
-  const updatedId = oneLine((input.toolResult as any)?.updated_id ?? "");
-  const updatedText = updatedId ? ` updated_id=${updatedId}` : "";
-
-  const patchKeys = Object.keys(input.effectiveArgs ?? {}).filter((k) => {
-    if (k === "route" || k === "element_id") return false;
-    const v = (input.effectiveArgs as any)[k];
-    return v !== undefined && v !== null;
-  });
-  patchKeys.sort((a, b) => a.localeCompare(b));
-  const keysText =
-    patchKeys.length > 0
-      ? ` keys=${oneLine(patchKeys.join(","), 140)}`
-      : "";
 
   const errText =
     successVal === false
       ? ` error=${oneLine((input.toolResult as any)?.error ?? "unknown", 160)}`
       : "";
 
+  const changedVal = (input.toolResult as any)?.changed;
+  const changedText =
+    typeof changedVal === "boolean" ? ` changed=${changedVal}` : "";
+
+  if (action === "insert") {
+    const parentId = getStringArg(input.effectiveArgs, "parent_id");
+    const beforeId = getStringArg(input.effectiveArgs, "before_id");
+    const insertedId = oneLine((input.toolResult as any)?.inserted_id ?? "");
+    const beforeText = beforeId ? ` before_id=${beforeId}` : "";
+    const insertedText = insertedId ? ` inserted_id=${insertedId}` : "";
+
+    return {
+      name: input.name,
+      summary: `modify_element (insert) ${successVal ? "success" : "failure"} route=${route} parent_id=${parentId}${beforeText}${insertedText}${changedText}${errText}`,
+    };
+  }
+
+  if (action === "delete") {
+    const elementId = getStringArg(input.effectiveArgs, "element_id");
+    const deletedId = oneLine((input.toolResult as any)?.deleted_id ?? "");
+    const deletedText = deletedId ? ` deleted_id=${deletedId}` : "";
+
+    return {
+      name: input.name,
+      summary: `modify_element (delete) ${successVal ? "success" : "failure"} route=${route} element_id=${elementId}${deletedText}${changedText}${errText}`,
+    };
+  }
+
+  if (action === "update_classname") {
+    const elementId = getStringArg(input.effectiveArgs, "element_id");
+    const className = oneLine((input.effectiveArgs as any).className ?? "", 160);
+    const updatedId = oneLine((input.toolResult as any)?.updated_id ?? "");
+    const updatedText = updatedId ? ` updated_id=${updatedId}` : "";
+
+    return {
+      name: input.name,
+      summary: `modify_element (update_classname) ${successVal ? "success" : "failure"} route=${route} element_id=${elementId} className="${className}"${updatedText}${changedText}${errText}`,
+    };
+  }
+
+  if (action === "update_props") {
+    const elementId = getStringArg(input.effectiveArgs, "element_id");
+    const updatedId = oneLine((input.toolResult as any)?.updated_id ?? "");
+    const updatedText = updatedId ? ` updated_id=${updatedId}` : "";
+
+    const propsObj = (input.effectiveArgs as any).props;
+    const patchKeys = Object.keys({
+      ...(typeof propsObj === "object" && propsObj !== null ? propsObj : {}),
+      ...input.effectiveArgs,
+    }).filter((k) => {
+      if (k === "route" || k === "element_id" || k === "action" || k === "props") return false;
+      const v = (input.effectiveArgs as any)[k] ?? (propsObj as any)?.[k];
+      return v !== undefined && v !== null;
+    });
+    patchKeys.sort((a, b) => a.localeCompare(b));
+    const keysText =
+      patchKeys.length > 0
+        ? ` keys=${oneLine(patchKeys.join(","), 140)}`
+        : "";
+
+    return {
+      name: input.name,
+      summary: `modify_element (update_props) ${successVal ? "success" : "failure"} route=${route} element_id=${elementId}${keysText}${updatedText}${changedText}${errText}`,
+    };
+  }
+
   return {
     name: input.name,
-    summary: `update_props ${successVal ? "success" : "failure"} route=${route} element_id=${elementId}${keysText}${updatedText}${changedText}${errText}`,
+    summary: `modify_element ${action} ${successVal ? "success" : "failure"} route=${route}${changedText}${errText}`,
   };
 };
 
@@ -278,11 +250,8 @@ const summarizeGenericSuccessFailure: ToolEventSummarizer = (input) => {
 
 const SUMMARIZERS: ToolEventSummarizer[] = [
   summarizeReadFile,
-  summarizeApplyPatch,
   summarizeCreateNewRoute,
-  summarizeInsertElement,
-  summarizeUpdateClassname,
-  summarizeUpdateProps,
+  summarizeModifyElement,
   summarizeUpdateGlobalStyles,
   summarizeSearch,
   summarizeListDir,

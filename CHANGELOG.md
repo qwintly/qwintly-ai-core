@@ -1,3 +1,10 @@
+## [1.6.7](https://github.com/vedangiitb/qwintly-core/compare/v1.6.6...v1.6.7) (2026-06-26)
+
+
+### Bug Fixes
+
+* update edit tools ([7a8a5c2](https://github.com/vedangiitb/qwintly-core/commit/7a8a5c2dfe78d837518110ecc2410931c6e24431))
+
 ## [1.6.6](https://github.com/vedangiitb/qwintly-core/compare/v1.6.5...v1.6.6) (2026-06-14)
 
 

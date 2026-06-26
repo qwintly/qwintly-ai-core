@@ -6,7 +6,7 @@ import fs from "node:fs/promises";
 import { FunctionCallingConfigMode } from "@google/genai";
 import { runToolLoop } from "../ai/toolLoop/toolLoopRunner.js";
 
-test("tool loop: insert_element failure includes available routes and hint", async () => {
+test("tool loop: modify_element insert failure includes available routes and hint", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-runner-"));
   try {
     await fs.mkdir(path.join(workspaceRoot, "app"), { recursive: true });
@@ -21,8 +21,9 @@ test("tool loop: insert_element failure includes available routes and hint", asy
         return {
           functionCalls: [
             {
-              name: "insert_element",
+              name: "modify_element",
               args: {
+                action: "insert",
                 route: "/invalid-route",
                 parent_id: "root",
                 elements: [
@@ -53,16 +54,16 @@ test("tool loop: insert_element failure includes available routes and hint", asy
       (c: any) =>
         c?.role === "user" &&
         Array.isArray(c?.parts) &&
-        c.parts.some((p: any) => p?.functionResponse?.name === "insert_element"),
+        c.parts.some((p: any) => p?.functionResponse?.name === "modify_element"),
     );
     assert.equal(toolResponses.length, 1);
 
     const response = toolResponses[0].parts.find(
-      (p: any) => p?.functionResponse?.name === "insert_element",
+      (p: any) => p?.functionResponse?.name === "modify_element",
     )?.functionResponse?.response;
 
     assert.equal(response?.success, false);
-    assert.match(String(response?.error ?? ""), /insert_element failed/i);
+    assert.match(String(response?.error ?? ""), /modify_element \(insert\) failed/i);
     assert.match(String(response?.error ?? ""), /create_new_route/i);
     assert.deepEqual(response?.available_routes, ["/dashboard"]);
   } finally {
@@ -121,7 +122,7 @@ test("tool loop: get_available_routes retrieves routes", async () => {
   }
 });
 
-test("tool loop: update_classname updates element's className using className parameter", async () => {
+test("tool loop: modify_element update_classname updates element's className using className parameter", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-runner-"));
   try {
     await fs.mkdir(path.join(workspaceRoot, "app"), { recursive: true });
@@ -148,8 +149,9 @@ test("tool loop: update_classname updates element's className using className pa
         return {
           functionCalls: [
             {
-              name: "update_classname",
+              name: "modify_element",
               args: {
+                action: "update_classname",
                 route: "/",
                 element_id: "el_mGCUHuZuL0",
                 className: "bg-red-600 font-bold",
@@ -178,12 +180,12 @@ test("tool loop: update_classname updates element's className using className pa
       (c: any) =>
         c?.role === "user" &&
         Array.isArray(c?.parts) &&
-        c.parts.some((p: any) => p?.functionResponse?.name === "update_classname"),
+        c.parts.some((p: any) => p?.functionResponse?.name === "modify_element"),
     );
     assert.equal(toolResponses.length, 1);
 
     const response = toolResponses[0].parts.find(
-      (p: any) => p?.functionResponse?.name === "update_classname",
+      (p: any) => p?.functionResponse?.name === "modify_element",
     )?.functionResponse?.response;
 
     assert.equal(response?.success, true);
@@ -196,7 +198,7 @@ test("tool loop: update_classname updates element's className using className pa
   }
 });
 
-test("tool loop: update_props updates element's props using root-level parameters", async () => {
+test("tool loop: modify_element update_props updates element's props using root-level parameters", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-runner-"));
   try {
     await fs.mkdir(path.join(workspaceRoot, "app"), { recursive: true });
@@ -225,8 +227,9 @@ test("tool loop: update_props updates element's props using root-level parameter
         return {
           functionCalls: [
             {
-              name: "update_props",
+              name: "modify_element",
               args: {
+                action: "update_props",
                 route: "/",
                 element_id: "el_k01Ij3HJvZ",
                 text: "Life is too short for boring flavors! This is pure strawberry joy.",
@@ -255,12 +258,12 @@ test("tool loop: update_props updates element's props using root-level parameter
       (c: any) =>
         c?.role === "user" &&
         Array.isArray(c?.parts) &&
-        c.parts.some((p: any) => p?.functionResponse?.name === "update_props"),
+        c.parts.some((p: any) => p?.functionResponse?.name === "modify_element"),
     );
     assert.equal(toolResponses.length, 1);
 
     const response = toolResponses[0].parts.find(
-      (p: any) => p?.functionResponse?.name === "update_props",
+      (p: any) => p?.functionResponse?.name === "modify_element",
     )?.functionResponse?.response;
 
     assert.equal(response?.success, true);
