@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/vedangiitb/qwintly-core/compare/v1.7.0...v1.7.1) (2026-07-18)
+
+
+### Bug Fixes
+
+* releaserc bugfix ([4f85c67](https://github.com/vedangiitb/qwintly-core/commit/4f85c6729dde5145baa38bab9a2b911bc3949341))
+
 # [1.7.0](https://github.com/vedangiitb/qwintly-core/compare/v1.6.8...v1.7.0) (2026-07-18)
 
 
