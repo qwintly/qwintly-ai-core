@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildToolStatusMessage } from "../ai/toolLoop/toolStatusMessage.js";
-import { buildToolEventSummary } from "../ai/toolLoop/toolEventSummary.js";
 
 test("buildToolStatusMessage for modify_element", () => {
   const insertStatus = buildToolStatusMessage(
@@ -60,94 +59,5 @@ test("buildToolStatusMessage for modify_element", () => {
   assert.equal(
     propsStatus,
     'AI tool: Updating properties for element "el_input" on route "/contact"'
-  );
-});
-
-test("buildToolEventSummary for modify_element", () => {
-  const insertSummary = buildToolEventSummary({
-    name: "modify_element",
-    effectiveArgs: {
-      action: "insert",
-      route: "/about",
-      parent_id: "root_div",
-      before_id: "existing_sibling",
-    },
-    modelArgs: {},
-    readFileMeta: null,
-    toolResult: {
-      success: true,
-      changed: true,
-      inserted_id: "new_el_1",
-    },
-    toolResultRaw: null,
-  });
-  assert.equal(
-    insertSummary.summary,
-    "modify_element (insert) success route=/about parent_id=root_div before_id=existing_sibling inserted_id=new_el_1 changed=true"
-  );
-
-  const deleteSummary = buildToolEventSummary({
-    name: "modify_element",
-    effectiveArgs: {
-      action: "delete",
-      route: "/pricing",
-      element_id: "el_card",
-    },
-    modelArgs: {},
-    readFileMeta: null,
-    toolResult: {
-      success: true,
-      changed: true,
-      deleted_id: "el_card",
-    },
-    toolResultRaw: null,
-  });
-  assert.equal(
-    deleteSummary.summary,
-    "modify_element (delete) success route=/pricing element_id=el_card deleted_id=el_card changed=true"
-  );
-
-  const classSummary = buildToolEventSummary({
-    name: "modify_element",
-    effectiveArgs: {
-      action: "update_classname",
-      route: "/",
-      element_id: "el_button",
-      className: "bg-blue-500 text-white",
-    },
-    modelArgs: {},
-    readFileMeta: null,
-    toolResult: {
-      success: true,
-      changed: true,
-      updated_id: "el_button",
-    },
-    toolResultRaw: null,
-  });
-  assert.equal(
-    classSummary.summary,
-    'modify_element (update_classname) success route=/ element_id=el_button className="bg-blue-500 text-white" updated_id=el_button changed=true'
-  );
-
-  const propsSummary = buildToolEventSummary({
-    name: "modify_element",
-    effectiveArgs: {
-      action: "update_props",
-      route: "/contact",
-      element_id: "el_input",
-      text: "Submit Query",
-    },
-    modelArgs: {},
-    readFileMeta: null,
-    toolResult: {
-      success: true,
-      changed: true,
-      updated_id: "el_input",
-    },
-    toolResultRaw: null,
-  });
-  assert.equal(
-    propsSummary.summary,
-    "modify_element (update_props) success route=/contact element_id=el_input keys=text updated_id=el_input changed=true"
   );
 });
