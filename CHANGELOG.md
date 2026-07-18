@@ -1,3 +1,17 @@
+## [1.7.1](https://github.com/vedangiitb/qwintly-core/compare/v1.7.0...v1.7.1) (2026-07-18)
+
+
+### Bug Fixes
+
+* releaserc bugfix ([4f85c67](https://github.com/vedangiitb/qwintly-core/commit/4f85c6729dde5145baa38bab9a2b911bc3949341))
+
+# [1.7.0](https://github.com/vedangiitb/qwintly-core/compare/v1.6.8...v1.7.0) (2026-07-18)
+
+
+### Features
+
+* adding message summarization for longer contexts ([4cf7811](https://github.com/vedangiitb/qwintly-core/commit/4cf781192f7347d73cd9f542fbdccc5bf0bf285f))
+
 ## [1.6.8](https://github.com/vedangiitb/qwintly-core/compare/v1.6.7...v1.6.8) (2026-06-26)
 
 

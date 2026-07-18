@@ -1,4 +1,4 @@
-import { ToolStatusManager } from "./status/ToolStatusManager.js";
+import { ToolStatusManager } from "./ToolStatusManager.js";
 
 const manager = new ToolStatusManager();
 

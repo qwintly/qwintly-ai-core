@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildToolStatusMessage } from "../ai/toolLoop/toolStatusMessage.js";
+import { buildToolStatusMessage } from "../ai/toolLoop/status/toolStatusMessage.js";
 
 test("buildToolStatusMessage for modify_element", () => {
   const insertStatus = buildToolStatusMessage(
