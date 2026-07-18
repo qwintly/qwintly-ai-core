@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FunctionCallingConfigMode } from "@google/genai";
-import { runToolLoop } from "../ai/toolLoop/toolLoopRunner.js";
+import { runToolLoop } from "../ai/toolLoop/runner/runToolLoop.js";
 
 test("tool loop: persists gen tokens from usageMetadata", async () => {
   const persisted: Array<{
@@ -39,7 +39,12 @@ test("tool loop: persists gen tokens from usageMetadata", async () => {
     tokenPersistence: {
       sessionId: "sess_123",
       repository: {
-        persistGenTokens: async (sessionId, input, output, model) => {
+        persistGenTokens: async (
+          sessionId: string,
+          input: number,
+          output: number,
+          model: string,
+        ) => {
           persisted.push({ sessionId, input, output, model });
         },
       },

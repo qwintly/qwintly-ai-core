@@ -57,6 +57,7 @@ test("modify_element insert: flat element tree under parent", async () => {
       parent_id: "root",
       elements: [
         { id: "new_el", parentId: "root", type: "text", props: { text: "hello" } },
+        { id: "el_standard", parentId: "root", type: "text", props: { text: "world" } },
       ],
     });
 
@@ -64,12 +65,17 @@ test("modify_element insert: flat element tree under parent", async () => {
     assert.equal((res as any).changed, true);
     const insertedId = (res as any).inserted_id as string;
     assert.ok(typeof insertedId === "string" && insertedId.startsWith("el_"));
+    assert.ok((res as any).id_map);
+    assert.equal((res as any).id_map["new_el"], insertedId);
+    assert.equal((res as any).id_map["el_standard"], undefined);
 
     const after = JSON.parse(await fs.readFile(filePath, "utf-8"));
     const children = after.elements[0].children as any[];
     // inserted at the end of the children array
-    assert.equal(children[children.length - 1].id, insertedId);
-    assert.equal(children[children.length - 1].props.text, "hello");
+    assert.equal(children[children.length - 2].id, insertedId);
+    assert.equal(children[children.length - 2].props.text, "hello");
+    assert.equal(children[children.length - 1].id, "el_standard");
+    assert.equal(children[children.length - 1].props.text, "world");
   } finally {
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
@@ -220,3 +226,75 @@ test("modify_element update_props: updates nested and flat props", async () => {
     await fs.rm(workspaceRoot, { recursive: true, force: true });
   }
 });
+
+test("modify_element resolving temporary IDs via idMap", async () => {
+  const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-"));
+  try {
+    const routeDir = path.join(workspaceRoot, "app", "a");
+    await fs.mkdir(routeDir, { recursive: true });
+    const filePath = path.join(routeDir, "pageConfig.json");
+    
+    // Page config starts with elements containing standard IDs and an idMap
+    await fs.writeFile(
+      filePath,
+      JSON.stringify(
+        {
+          elements: [
+            {
+              id: "root",
+              type: "div",
+              children: [
+                { id: "el_standard_1", type: "text", props: { text: "hello" } },
+              ],
+            },
+          ],
+          idMap: {
+            "temp_child_id": "el_standard_1",
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf-8",
+    );
+
+    const deps = { workspaceRoot, fs: makeRealFs() } as any;
+    const modify = createModifyElementImpl(deps);
+
+    // 1. Try resolving using a mapped temporary ID
+    const updateRes = await modify({
+      action: "update_classname",
+      route: "/a",
+      element_id: "temp_child_id",
+      className: "my-resolved-class",
+    });
+    assert.equal(updateRes.success, true);
+
+    const afterUpdate = JSON.parse(await fs.readFile(filePath, "utf-8"));
+    assert.equal(afterUpdate.elements[0].children[0].className, "my-resolved-class");
+
+    // 2. Try using an unmapped temporary ID -> should fail immediately
+    const failRes = await modify({
+      action: "update_classname",
+      route: "/a",
+      element_id: "non_existent_temp_id",
+      className: "should-fail",
+    });
+    assert.equal(failRes.success, false);
+    assert.ok(String((failRes as any).error).includes("auto-generated standard IDs"));
+
+    // 3. Try deleting using the mapped temporary ID
+    const deleteRes = await modify({
+      action: "delete",
+      route: "/a",
+      element_id: "temp_child_id",
+    });
+    assert.equal(deleteRes.success, true);
+
+    const afterDelete = JSON.parse(await fs.readFile(filePath, "utf-8"));
+    assert.equal(afterDelete.elements[0].children.length, 0);
+  } finally {
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
+  }
+});
+

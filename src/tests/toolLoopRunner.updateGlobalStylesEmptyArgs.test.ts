@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FunctionCallingConfigMode } from "@google/genai";
-import { runToolLoop } from "../ai/toolLoop/toolLoopRunner.js";
+import { runToolLoop } from "../ai/toolLoop/runner/runToolLoop.js";
 
 test("tool loop: update_global_styles empty tokens is rejected without calling handler", async () => {
   let aiCalls = 0;

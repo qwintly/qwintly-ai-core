@@ -2,12 +2,16 @@ import { FunctionCallingConfigMode, Tool } from "@google/genai";
 import { EVENT_TYPES } from "../../../types/events.js";
 import { computeBackoffMs, sleep } from "../../../utils/utils.js";
 import { isTransientAiCallError } from "./errors.helper.js";
-import { AiCallFn, Logger } from "../toolLoopRunner.js";
+import { AiCallFn, Logger } from "../types/runner.types.js";
 
 export const aiCallWithRetry = async (params: {
   aiCall: AiCallFn;
   request: unknown;
-  options: { tools?: Tool[]; toolCallingMode?: FunctionCallingConfigMode };
+  options: {
+    tools?: Tool[];
+    toolCallingMode?: FunctionCallingConfigMode;
+    systemInstruction?: string;
+  };
   retryMax: number;
   retryBaseMs: number;
   retryMaxMs: number;

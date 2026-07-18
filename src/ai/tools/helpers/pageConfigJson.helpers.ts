@@ -7,6 +7,7 @@ import { toWorkspacePath } from "./fileSystem.helpers.js";
 
 export type PageConfigJson = {
   elements: BuilderElement[];
+  idMap?: Record<string, string>;
 };
 
 export const normalizeRouteSegments = (route: string): string[] => {
@@ -53,11 +54,23 @@ export const parsePageConfigJson = (content: string): PageConfigJson => {
     throw new Error('pageConfig.json must contain "elements" array');
   }
 
-  return { elements: elements as BuilderElement[] };
+  const idMap = (parsed as any).idMap;
+
+  return {
+    elements: elements as BuilderElement[],
+    idMap: typeof idMap === "object" && idMap !== null ? (idMap as Record<string, string>) : {},
+  };
 };
 
 export const stringifyPageConfigJson = (config: PageConfigJson) =>
-  JSON.stringify({ elements: config.elements ?? [] }, null, 2) + "\n";
+  JSON.stringify(
+    {
+      elements: config.elements ?? [],
+      idMap: config.idMap ?? {},
+    },
+    null,
+    2,
+  ) + "\n";
 
 export const extractAllIdsDeep = (elements: BuilderElement[]) => {
   const ids = new Set<string>();
@@ -77,23 +90,36 @@ export const extractAllIdsDeep = (elements: BuilderElement[]) => {
 export const ensureElementIds = (
   elements: BuilderElement[],
   existingIds: Set<string>,
-) => {
+  forceStandardFormat = false,
+): Record<string, string> => {
+  const idMap: Record<string, string> = {};
   const seen = new Set<string>();
   const walk = (arr: BuilderElement[]) => {
     for (const el of arr) {
       if (!el || typeof el !== "object") continue;
 
       const anyEl = el as any;
-      const currentId = typeof anyEl.id === "string" ? anyEl.id.trim() : "";
-      if (!currentId || seen.has(currentId)) {
-        const newId = createElementId(existingIds);
-        anyEl.id = newId;
-        existingIds.add(newId);
-        seen.add(newId);
+      const originalId = typeof anyEl.id === "string" ? anyEl.id.trim() : "";
+      
+      const isStandardFormat = originalId.startsWith("el_");
+      const shouldGenerate = forceStandardFormat
+        ? (!isStandardFormat || !originalId || seen.has(originalId))
+        : (!originalId || seen.has(originalId));
+
+      let finalId = originalId;
+      if (shouldGenerate) {
+        finalId = createElementId(existingIds);
+        anyEl.id = finalId;
+        existingIds.add(finalId);
+        seen.add(finalId);
       } else {
-        anyEl.id = currentId;
-        existingIds.add(currentId);
-        seen.add(currentId);
+        anyEl.id = originalId;
+        existingIds.add(originalId);
+        seen.add(originalId);
+      }
+
+      if (originalId && !originalId.startsWith("el_")) {
+        idMap[originalId] = finalId;
       }
 
       if (Array.isArray(anyEl.children)) {
@@ -102,6 +128,7 @@ export const ensureElementIds = (
     }
   };
   walk(elements);
+  return idMap;
 };
 
 export const findElementById = (
@@ -373,5 +400,6 @@ export const loadAndPreparePageConfig = async (
     configPath,
     elements,
     existingIds,
+    idMap: parsed.idMap ?? {},
   };
 };

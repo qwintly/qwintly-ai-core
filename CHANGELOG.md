@@ -1,3 +1,10 @@
+## [1.6.8](https://github.com/vedangiitb/qwintly-core/compare/v1.6.7...v1.6.8) (2026-06-26)
+
+
+### Bug Fixes
+
+* fixing insert id bugs ([6a229c7](https://github.com/vedangiitb/qwintly-core/commit/6a229c7b56280f50d40a3ba558470e232aebedc6))
+
 ## [1.6.7](https://github.com/vedangiitb/qwintly-core/compare/v1.6.6...v1.6.7) (2026-06-26)
 
 

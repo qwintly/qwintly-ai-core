@@ -1,4 +1,4 @@
-import { TokenPersistence } from "../toolLoopRunner.js";
+import { TokenPersistence } from "../types/runner.types.js";
 
 export const persistTokensOnce = async (
   tokenPersistence: TokenPersistence | undefined,

@@ -4,7 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import fs from "node:fs/promises";
 import { FunctionCallingConfigMode } from "@google/genai";
-import { runToolLoop } from "../ai/toolLoop/toolLoopRunner.js";
+import { runToolLoop } from "../ai/toolLoop/runner/runToolLoop.js";
 
 test("tool loop: modify_element insert failure includes available routes and hint", async () => {
   const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qwintly-core-runner-"));

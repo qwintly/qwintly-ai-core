@@ -13,6 +13,7 @@ type AIResponseOptions = {
   tools?: Tool[];
   schema?: ZodSchema;
   toolCallingMode?: FunctionCallingConfigMode;
+  systemInstruction?: string;
 };
 
 export class GenerateGeminiReponse {
@@ -34,6 +35,10 @@ export class GenerateGeminiReponse {
     } = options;
 
     const config: GenerateContentConfig = {};
+
+    if (options.systemInstruction) {
+      config.systemInstruction = options.systemInstruction;
+    }
 
     if (tools && tools.length > 0) {
       config.tools = tools;

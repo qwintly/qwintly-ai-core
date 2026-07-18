@@ -1,4 +1,7 @@
-import { resolveUnsplashImagesDeep, resolveUnsplashImageForElement } from "../../../image/unsplash.service.js";
+import {
+  resolveUnsplashImagesDeep,
+  resolveUnsplashImageForElement,
+} from "../../../image/unsplash.service.js";
 import type { BuilderElement } from "../../../types/elements.js";
 import {
   ensureElementIds,
@@ -11,7 +14,10 @@ import {
 import { ModifyElementArgsZod } from "../validators/builderElement.zod.js";
 import { type WorkspaceDeps } from "./workspaceDeps.js";
 
-function reconstructTree(flatElements: any[], parentId: string): BuilderElement[] {
+function reconstructTree(
+  flatElements: any[],
+  parentId: string,
+): BuilderElement[] {
   const rootFlats = flatElements.filter((el) => el.parentId === parentId);
   if (rootFlats.length === 0) {
     throw new Error(`No root element found with parentId '${parentId}'`);
@@ -20,6 +26,7 @@ function reconstructTree(flatElements: any[], parentId: string): BuilderElement[
   const buildMap = new Map<string, any>();
   for (const flat of flatElements) {
     buildMap.set(flat.id, {
+      id: flat.id,
       type: flat.type,
       className: flat.className,
       visible: flat.visible,
@@ -75,6 +82,27 @@ const applyPropsPatch = (el: BuilderElement, patch: any) => {
   apply("strokeWidth", patch.strokeWidth);
 };
 
+function resolveId(
+  id: string,
+  idMap: Record<string, string>,
+  elements: BuilderElement[],
+): string | null {
+  const trimmed = id.trim();
+  if (!trimmed) return null;
+  if (trimmed === "root") {
+    if (elements.length > 0 && elements[0]) {
+      return elements[0].id;
+    }
+    return "root";
+  }
+  if (trimmed.startsWith("el_")) return trimmed;
+  if (idMap[trimmed]) return idMap[trimmed];
+  if (findElementById(elements, trimmed) !== null) {
+    return trimmed;
+  }
+  return null;
+}
+
 export const createModifyElementImpl = (deps: WorkspaceDeps) => {
   const { workspaceRoot, fs } = deps;
 
@@ -94,17 +122,51 @@ export const createModifyElementImpl = (deps: WorkspaceDeps) => {
     if (!prep.success) return prep;
 
     const { configPath, elements, existingIds } = prep;
+    const pageIdMap = prep.idMap ?? {};
 
     let changed = false;
     let resultPayload: Record<string, unknown> = {};
 
     switch (action) {
       case "insert": {
-        const { parent_id, before_id, elements: inputElements } = parsedArgs.data;
-        const parentIdStr = String(parent_id ?? "").trim();
-        if (!parentIdStr) return { success: false, error: "invalid parent_id" };
+        const {
+          parent_id,
+          before_id,
+          elements: inputElements,
+        } = parsedArgs.data;
+        const originalParentId = String(parent_id ?? "").trim();
+        const parentIdStr = resolveId(originalParentId, pageIdMap, elements);
+        if (!parentIdStr) {
+          return {
+            success: false,
+            error: `Parent ID '${originalParentId}' not found. If you recently inserted elements, the system may have auto-generated standard IDs (like 'el_<random>') for them. You must call read_file on the route's pageConfig.json to find the correct IDs, or look at the id_map returned by the insert action.`,
+          };
+        }
 
-        const beforeIdStr = String(before_id ?? "").trim();
+        // update inputElements parentId references if parentIdStr was resolved
+        if (parentIdStr !== originalParentId) {
+          for (const el of inputElements) {
+            if (
+              el &&
+              typeof el === "object" &&
+              el.parentId === originalParentId
+            ) {
+              el.parentId = parentIdStr;
+            }
+          }
+        }
+
+        let beforeIdStr = String(before_id ?? "").trim();
+        if (beforeIdStr) {
+          const resolvedBefore = resolveId(beforeIdStr, pageIdMap, elements);
+          if (!resolvedBefore) {
+            return {
+              success: false,
+              error: `Before ID '${beforeIdStr}' not found. If you recently inserted elements, the system may have auto-generated standard IDs (like 'el_<random>') for them. You must call read_file on the route's pageConfig.json to find the correct IDs, or look at the id_map returned by the insert action.`,
+            };
+          }
+          beforeIdStr = resolvedBefore;
+        }
 
         let toInsert: BuilderElement[];
         try {
@@ -119,7 +181,8 @@ export const createModifyElementImpl = (deps: WorkspaceDeps) => {
         for (const el of toInsert) {
           await resolveUnsplashImagesDeep(el);
         }
-        ensureElementIds(toInsert, existingIds);
+        const insertedIdMap = ensureElementIds(toInsert, existingIds, true);
+        Object.assign(pageIdMap, insertedIdMap);
 
         if (elements.length === 0) {
           elements.push(...toInsert);
@@ -132,7 +195,11 @@ export const createModifyElementImpl = (deps: WorkspaceDeps) => {
             anyParent.children = [];
 
           const children = anyParent.children as BuilderElement[];
-          const idx = beforeIdStr ? children.findIndex((c: any) => String(c?.id ?? "") === beforeIdStr) : -1;
+          const idx = beforeIdStr
+            ? children.findIndex(
+                (c: any) => String(c?.id ?? "") === beforeIdStr,
+              )
+            : -1;
           if (idx >= 0) {
             children.splice(idx, 0, ...toInsert);
           } else {
@@ -144,14 +211,21 @@ export const createModifyElementImpl = (deps: WorkspaceDeps) => {
         resultPayload = {
           inserted_id: (toInsert[0] as any).id,
           inserted_ids: toInsert.map((el: any) => el.id),
+          id_map: insertedIdMap,
         };
         break;
       }
 
       case "delete": {
         const { element_id } = parsedArgs.data;
-        const elementIdStr = String(element_id ?? "").trim();
-        if (!elementIdStr) return { success: false, error: "invalid element_id" };
+        const originalElementId = String(element_id ?? "").trim();
+        const elementIdStr = resolveId(originalElementId, pageIdMap, elements);
+        if (!elementIdStr) {
+          return {
+            success: false,
+            error: `Element '${originalElementId}' not found. If you recently inserted elements, the system may have auto-generated standard IDs (like 'el_<random>') for them. You must call read_file on the route's pageConfig.json to find the correct IDs, or look at the id_map returned by the insert action.`,
+          };
+        }
 
         const isRoot = elements.some((el) => el?.id === elementIdStr);
         if (isRoot) {
@@ -162,17 +236,33 @@ export const createModifyElementImpl = (deps: WorkspaceDeps) => {
         if (deleted) {
           changed = true;
           resultPayload = { deleted_id: elementIdStr };
+        } else {
+          return {
+            success: false,
+            error: `Element '${originalElementId}' not found. If you recently inserted elements, the system may have auto-generated standard IDs (like 'el_<random>') for them. You must call read_file on the route's pageConfig.json to find the correct IDs, or look at the id_map returned by the insert action.`,
+          };
         }
         break;
       }
 
       case "update_classname": {
         const { element_id, className } = parsedArgs.data;
-        const elementIdStr = String(element_id ?? "").trim();
-        if (!elementIdStr) return { success: false, error: "invalid element_id" };
+        const originalElementId = String(element_id ?? "").trim();
+        const elementIdStr = resolveId(originalElementId, pageIdMap, elements);
+        if (!elementIdStr) {
+          return {
+            success: false,
+            error: `Element '${originalElementId}' not found. If you recently inserted elements, the system may have auto-generated standard IDs (like 'el_<random>') for them. You must call read_file on the route's pageConfig.json to find the correct IDs, or look at the id_map returned by the insert action.`,
+          };
+        }
 
         const el = findElementById(elements, elementIdStr);
-        if (!el) return { success: false, error: "element not found" };
+        if (!el) {
+          return {
+            success: false,
+            error: `Element '${originalElementId}' not found. If you recently inserted elements, the system may have auto-generated standard IDs (like 'el_<random>') for them. You must call read_file on the route's pageConfig.json to find the correct IDs, or look at the id_map returned by the insert action.`,
+          };
+        }
 
         const class_name = String(className ?? "");
         if ((el as any).className !== class_name) {
@@ -185,11 +275,22 @@ export const createModifyElementImpl = (deps: WorkspaceDeps) => {
 
       case "update_props": {
         const { element_id, props, ...flatProps } = parsedArgs.data;
-        const elementIdStr = String(element_id ?? "").trim();
-        if (!elementIdStr) return { success: false, error: "invalid element_id" };
+        const originalElementId = String(element_id ?? "").trim();
+        const elementIdStr = resolveId(originalElementId, pageIdMap, elements);
+        if (!elementIdStr) {
+          return {
+            success: false,
+            error: `Element '${originalElementId}' not found. If you recently inserted elements, the system may have auto-generated standard IDs (like 'el_<random>') for them. You must call read_file on the route's pageConfig.json to find the correct IDs, or look at the id_map returned by the insert action.`,
+          };
+        }
 
         const el = findElementById(elements, elementIdStr);
-        if (!el) return { success: false, error: "element not found" };
+        if (!el) {
+          return {
+            success: false,
+            error: `Element '${originalElementId}' not found. If you recently inserted elements, the system may have auto-generated standard IDs (like 'el_<random>') for them. You must call read_file on the route's pageConfig.json to find the correct IDs, or look at the id_map returned by the insert action.`,
+          };
+        }
 
         const mergedProps = {
           ...(typeof props === "object" && props !== null ? props : {}),
@@ -211,7 +312,7 @@ export const createModifyElementImpl = (deps: WorkspaceDeps) => {
     }
 
     if (changed) {
-      const after = stringifyPageConfigJson({ elements });
+      const after = stringifyPageConfigJson({ elements, idMap: pageIdMap });
       try {
         await writeFileAtomic(configPath, after);
       } catch (err) {
