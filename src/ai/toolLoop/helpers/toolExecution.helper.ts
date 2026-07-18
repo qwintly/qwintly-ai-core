@@ -15,7 +15,8 @@ export async function executeToolHandler(params: {
   step: number;
   logger: Logger;
 }): Promise<unknown> {
-  const { name, handler, effectiveArgs, styleTokenKeySet, step, logger } = params;
+  const { name, handler, effectiveArgs, styleTokenKeySet, step, logger } =
+    params;
 
   if (!handler) {
     return {
@@ -69,10 +70,17 @@ export function postProcessToolResult(params: {
   readFileMeta: { start: number; end: number; wasCapped: boolean } | null;
   readFileDefaultMaxLines?: number;
 }): unknown {
-  const { name, toolResultRaw, effectiveArgs, readFileMeta, readFileDefaultMaxLines } = params;
+  const {
+    name,
+    toolResultRaw,
+    effectiveArgs,
+    readFileMeta,
+    readFileDefaultMaxLines,
+  } = params;
 
   if (name === "read_file" && readFileMeta) {
-    const path = typeof effectiveArgs.path === "string" ? effectiveArgs.path : "";
+    const path =
+      typeof effectiveArgs.path === "string" ? effectiveArgs.path : "";
 
     const originalJsonPayload =
       (toolResultRaw as any)?.kind === "json"

@@ -6,7 +6,7 @@ import {
   executeToolHandler,
   postProcessToolResult,
 } from "../helpers/toolExecution.helper.js";
-import { buildToolStatusMessage } from "../toolStatusMessage.js";
+import { buildToolStatusMessage } from "../status/toolStatusMessage.js";
 import { ToolLoopContextPolicy } from "../types/context.types.js";
 import { Logger } from "../types/runner.types.js";
 import { createWorkspaceToolImpls } from "../../tools/implementations/factories.js";

@@ -96,25 +96,18 @@ export class ToolLoopCoordinator {
   public async run(): Promise<ToolLoopResult> {
     for (let step = 0; step < this.maxSteps; step++) {
       const currentStep = step + 1;
-      await this.compactContext(currentStep, this.traceManager);
-      this.logApproxModelCharsIfEnabled(currentStep, this.traceManager);
+      await this.compactContext(currentStep);
+      this.logApproxModelCharsIfEnabled(currentStep);
 
       let response: AiCallResponse;
       try {
-        response = await this.performAiCallWithRetry(
-          currentStep,
-          this.traceManager,
-        );
+        response = await this.performAiCallWithRetry(currentStep);
       } catch (err) {
-        await this.handleProviderError(currentStep, err, this.traceManager);
+        await this.handleProviderError(currentStep, err);
         continue;
       }
 
-      await this.persistResponseIfEnabled(
-        currentStep,
-        response,
-        this.traceManager,
-      );
+      await this.persistResponseIfEnabled(currentStep, response);
       this.tokenManager.recordUsage(response);
 
       const functionCalls = response.functionCalls ?? [];
@@ -131,12 +124,7 @@ export class ToolLoopCoordinator {
         };
       }
 
-      const result = await this.executeFunctionCalls(
-        currentStep,
-        response,
-        this.traceManager,
-        this.tokenManager,
-      );
+      const result = await this.executeFunctionCalls(currentStep, response);
 
       if (result) {
         return result;
@@ -155,13 +143,10 @@ export class ToolLoopCoordinator {
     };
   }
 
-  private async compactContext(
-    step: number,
-    traceManager: HistoryTraceManager,
-  ): Promise<void> {
+  private async compactContext(step: number): Promise<void> {
     const compacted = await compactForModelAsync({
-      initialCount: traceManager.getPinnedInitialCount(),
-      modelContents: traceManager.getModelContents(),
+      initialCount: this.traceManager.getPinnedInitialCount(),
+      modelContents: this.traceManager.getModelContents(),
       aiCall: this.aiCall,
       aiCallAutoRetryMax: this.aiCallAutoRetryMax,
       aiCallAutoRetryBaseMs: this.aiCallAutoRetryBaseMs,
@@ -169,28 +154,22 @@ export class ToolLoopCoordinator {
       logger: this.logger,
       step,
     });
-    traceManager.setModelContents(compacted);
+    this.traceManager.setModelContents(compacted);
   }
 
-  private logApproxModelCharsIfEnabled(
-    step: number,
-    traceManager: HistoryTraceManager,
-  ): void {
+  private logApproxModelCharsIfEnabled(step: number): void {
     if (this.policy.logApproxModelChars) {
       const approxChars = JSON.stringify(
-        traceManager.getModelContents(),
+        this.traceManager.getModelContents(),
       ).length;
       console.log("Tool loop: approx model chars", { approxChars, step });
     }
   }
 
-  private async performAiCallWithRetry(
-    step: number,
-    traceManager: HistoryTraceManager,
-  ): Promise<AiCallResponse> {
+  private async performAiCallWithRetry(step: number): Promise<AiCallResponse> {
     return await aiCallWithRetry({
       aiCall: this.aiCall,
-      request: traceManager.getModelContents(),
+      request: this.traceManager.getModelContents(),
       options: { tools: this.tools, toolCallingMode: this.toolCallingMode },
       retryMax: this.aiCallAutoRetryMax,
       retryBaseMs: this.aiCallAutoRetryBaseMs,
@@ -200,11 +179,7 @@ export class ToolLoopCoordinator {
     });
   }
 
-  private async handleProviderError(
-    step: number,
-    err: unknown,
-    traceManager: HistoryTraceManager,
-  ): Promise<void> {
+  private async handleProviderError(step: number, err: unknown): Promise<void> {
     await this.logger(
       "Tool loop: AI provider error; preserving context and continuing",
       EVENT_TYPES.STEP_ERROR,
@@ -228,18 +203,20 @@ export class ToolLoopCoordinator {
       ],
     };
     if (this.keepFullTrace) {
-      traceManager.getFullTraceContents().push(providerErrorInstruction);
+      this.traceManager.getFullTraceContents().push(providerErrorInstruction);
     }
   }
 
   private async persistResponseIfEnabled(
     step: number,
     response: AiCallResponse,
-    traceManager: HistoryTraceManager,
   ): Promise<void> {
     if (this.persistResponse) {
       try {
-        await this.persistResponse(traceManager.getModelContents(), response);
+        await this.persistResponse(
+          this.traceManager.getModelContents(),
+          response,
+        );
       } catch (err) {
         console.error("Tool loop: failed to persist response", err, { step });
       }
@@ -249,8 +226,6 @@ export class ToolLoopCoordinator {
   private async executeFunctionCalls(
     step: number,
     response: AiCallResponse,
-    traceManager: HistoryTraceManager,
-    tokenManager: TokenPersistenceManager,
   ): Promise<ToolLoopResult | null> {
     const functionCalls = response.functionCalls ?? [];
     const signatureById = extractThoughtSignatures(response);
@@ -264,28 +239,30 @@ export class ToolLoopCoordinator {
 
       if (executionResult.malformedMessage) {
         if (this.keepFullTrace) {
-          traceManager
+          this.traceManager
             .getFullTraceContents()
             .push(executionResult.malformedMessage);
         }
-        traceManager.getModelContents().push(executionResult.malformedMessage);
+        this.traceManager
+          .getModelContents()
+          .push(executionResult.malformedMessage);
         continue;
       }
 
-      traceManager.pushAssistantMessage(
+      this.traceManager.pushAssistantMessage(
         executionResult.assistantFull,
         executionResult.assistantModel,
       );
 
-      traceManager.pushUserMessage(executionResult.responseFull);
+      this.traceManager.pushUserMessage(executionResult.responseFull);
 
       if (this.terminalToolNames.includes(executionResult.name)) {
-        await tokenManager.persist();
+        await this.tokenManager.persist();
         return {
           contents: this.keepFullTrace
-            ? traceManager.getFullTraceContents()
-            : traceManager.getModelContents(),
-          modelContents: traceManager.getModelContents(),
+            ? this.traceManager.getFullTraceContents()
+            : this.traceManager.getModelContents(),
+          modelContents: this.traceManager.getModelContents(),
           finalText: "",
           steps: step,
           terminalCall: {

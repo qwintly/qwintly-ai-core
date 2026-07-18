@@ -25,7 +25,9 @@ export function createToolHandlers(params: {
       return { content };
     },
     search: async (args) => {
-      const results = await params.impls.searchImpl(String(args.search_query ?? ""));
+      const results = await params.impls.searchImpl(
+        String(args.search_query ?? ""),
+      );
       return { results };
     },
     update_global_styles: async (args) => {
@@ -35,7 +37,10 @@ export function createToolHandlers(params: {
     create_new_route: async (args) => {
       const parentRoute = String(args.parent_route ?? "");
       const routeName = String(args.route_name ?? "");
-      const result = await params.impls.createNewRouteImpl(parentRoute, routeName);
+      const result = await params.impls.createNewRouteImpl(
+        parentRoute,
+        routeName,
+      );
       return result;
     },
     modify_element: async (args) => {
@@ -54,7 +59,10 @@ export function createToolHandlers(params: {
       return result;
     },
     get_available_routes: async (args) => {
-      const routes = await getAvailableRoutes({ workspaceRoot: params.workspaceRoot, fs: nodeFs });
+      const routes = await getAvailableRoutes({
+        workspaceRoot: params.workspaceRoot,
+        fs: nodeFs,
+      });
       return { success: true, routes };
     },
     submit_codegen_done: async (args) => ({

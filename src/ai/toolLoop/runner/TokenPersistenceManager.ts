@@ -1,11 +1,11 @@
-import { TokenPersistence } from "../types/runner.types.js";
 import {
   extractUsageTokenCounts,
   persistTokensOnce,
 } from "../helpers/persistTokens.helpers.js";
+import { TokenPersistence } from "../types/runner.types.js";
 
 export class TokenPersistenceManager {
-  private tokenPersistence: TokenPersistence | undefined;
+  private readonly tokenPersistence: TokenPersistence | undefined;
   private totalInputTokens = 0;
   private totalOutputTokens = 0;
   private sawAnyTokenUsage = false;
