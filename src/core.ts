@@ -1,11 +1,8 @@
 import { FunctionCallingConfigMode, Tool } from "@google/genai";
 import { DEFAULT_MODEL } from "./ai/generate/gemini.client.js";
 import { getClient } from "./ai/generate/generateClient.js";
-import {
-  runToolLoop,
-  RunToolLoopOptions,
-  ToolLoopResult,
-} from "./ai/toolLoop/toolLoopRunner.js";
+import { runToolLoop } from "./ai/toolLoop/runner/runToolLoop.js";
+import { RunToolLoopOptions, ToolLoopResult } from "./ai/toolLoop/types/runner.types.js";
 import { initUnsplash } from "./image/unsplash.service.js";
 import { buildCodegenIndex } from "./indexer/codegenIndex.js";
 import { buildPlannerIndex } from "./indexer/plannerIndex.js";
@@ -43,6 +40,7 @@ export type QwintlyCoreOptions = {
 type AiResponseOptions = {
   tools?: Tool[];
   toolCallingMode?: FunctionCallingConfigMode;
+  systemInstruction?: string;
 };
 
 type AiClient = {
@@ -154,10 +152,11 @@ export class QwintlyCore {
       workspaceRoot: this.workspacePath,
       maxSteps: maxSteps,
       terminalToolNames: terminalToolNames,
-      aiCall: (request, options) =>
+      aiCall: (request: unknown, options: any) =>
         this.aiClient!.aiResponse(request, {
           tools: options.tools,
           toolCallingMode: options.toolCallingMode,
+          systemInstruction: options.systemInstruction,
         }),
       logger: this.streamLog.bind(this),
       persistResponse,
